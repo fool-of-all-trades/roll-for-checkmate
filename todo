@@ -24,8 +24,7 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Dodać do Assets/Art/ grafikę pionków
 ✅  Pociąć grafikę pionków
 🔲  Konfiguracja kamery na Orthographic, size, bg colour
-🔲  Dodać GameManager w Hierarchy i metody Init() i Update()
-🔲  Stworzyć prefaby pionków
+✅  Stworzyć prefaby pionków, bez skryptów
 
 1.4 Ładowanie planszy i pierwsze skrypty:
 ✅  Stworzyć szachownicę
