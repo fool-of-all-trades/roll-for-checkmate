@@ -5,21 +5,19 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Zainstalować/zweryfikować wersję Unity hub (3.12.1)
 ✅  Zorientować się która wersja Unity będzie potrzebna do zrobienia multiplayer bez walenia w klawiaturę (2022.3.62f1 LTS)
 ✅  Zainstalować/zweryfikować wersję Unity oraz potrzebny pakiet "Opracowywanie gier za pomocą aparatu Unity" w Visual Studio 2022 
-🔲  Stworzyć pusty projekt w Unity
-🔲  Sprawdzić, czy mamy zainstalowaną wydajność LTS
-🔲  Wykonać pierwszy commit
+✅  W Unity stworzyć nowy Universal 2D - URP (SRP) projekt RollForCheckmate
+✅  Wykonać pierwszy commit
 
 1.2 Struktura projektu:
-🔲  W Unity stworzyć nowy 2D projekt RollForCheckmate
-🔲  Wystartować i zamknąć raz, by wygenerować domyślne pliki
-🔲  W katalogu Assets/ utworzyć foldery:
-      🔲  Scenes/
-      🔲  Scripts/
-      🔲  Prefabs/
-      🔲  Art/
-      🔲  Animations/
-      🔲  Materials/
-      🔲  Plugins/ (dla multiplayer)
+✅  Wystartować projekt i zamknąć raz, by wygenerować domyślne pliki
+✅  W katalogu Assets/ utworzyć foldery:
+      ✅  Scenes/
+      ✅  Scripts/
+      ✅  Prefabs/
+      ✅  Art/
+      ✅  Animations/
+      ✅  Materials/
+      ✅  Plugins/ (dla multiplayer)
 🔲  Dodać do Assets/Art/ wszystkie dotychczasowe grafiki
 🔲  Commit: "Add project structure + art assets"
 
