@@ -18,14 +18,16 @@ Boss nr 1: Setup i przygotowanie projektu
       ✅  Animations/
       ✅  Materials/
       ✅  Plugins/ (dla multiplayer)
-🔲  Dodać do Assets/Art/ wszystkie dotychczasowe grafiki
-🔲  Commit: "Add project structure + art assets"
+✅  Commit: "Add project structure + art assets"
 
 1.3 Podstawowa scena i prefaby:
-🔲  
-🔲  
-🔲  
-🔲  
+✅  Dodać do Assets/Art/ grafikę pionków
+✅  Pociąć grafikę pionków
+🔲  Konfiguracja kamery na Orthographic, size, bg colour
+🔲  Dodać GameManager w Hierarchy i metody Init() i Update()
+🔲  Stworzyć prefaby pionków
+
+1.4 Ładowanie planszy i pierwsze skrypty:
 🔲  
 🔲  
 🔲  
