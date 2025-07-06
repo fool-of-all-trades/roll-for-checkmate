@@ -24,17 +24,73 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Dodać do Assets/Art/ grafikę pionków
 ✅  Pociąć grafikę pionków
 🔲  Konfiguracja kamery na Orthographic, size, bg colour
+🔲  Pozycja planszy i UI na scenie
 ✅  Stworzyć prefaby pionków, bez skryptów
 
-1.4 Ładowanie planszy i pierwsze skrypty:
+1.4 Ładowanie planszy i układ sceny:
 ✅  Stworzyć szachownicę
-🔲  Ustawić pionki na odpowiednich miejscach
-🔲  
-🔲  
-🔲  
+✅  Stworzyć odpowiednie przyciski
+✅  Spawnować pionki na odpowiednich miejscach
+🔲  Stworzyć scenę początkową/title screen
+🔲  Stworzyć przejście między scenami
+🔲  Podświetlanie możliwych do wyboru pól
+
+1.5 Przepisać pliki z pionkami:
+✅  Bishop
+✅  King
+✅  Knight
+✅  Pawn
+✅  Piece
+✅  Queen
+✅  Rook
+
+1.6 Przepisać pliki z umiejętnościami:
+✅  Ability
+✅  BishopUltimateAbility
+✅  KingUltimateAbility
+✅  KnightUltimateAbility
+✅  RookUltimateAbility
+
+1.7 Przepisać pozostałe pliki:
+✅  Game
+✅  Main
+✅  Dice
+✅  ChessBoard
+🔲  TitleScreen
+✅  Checker
+✅  GameController
+
+1.8 Podpiąć pliki pod prefaby (GameController nigdzie nie jest podpinany):
+✅  Pionki
+✅  GameManager
+✅  ChessBoard
+
+1.9 Gra działa?
+🔲  Działa
+✅  Chyba?
+
+Boss nr 2: Dodanie multiplayer i animacji i modów
+2.1 Rozbić duże pliki:
+🔲  ChessBoard
+🔲  GameController
+
+2.2  Implementacja multiplayera
+🔲  Wybrać rozwiązanie (Photon PUN2 / Mirror + Steam P2P / UGS)
+🔲  Zainstalować pakiet i skonfigurować
+🔲  Stworzyć NetworkManager.cs z metodami Host()/Join()
+🔲  Dodać NetworkedPiece.cs (RPC Move, SyncVar Team/Position)
+🔲  Test: dwa klienty w edytorze łączą się i synchronizują ruch
+
+2.3  Animacje
+🔲  Mini duszek królowej unoszący się koło przeklętego pionka?
+🔲  Transformacja drużyny pionka przez świętą drogę księdza?
+🔲  Wskrzeszanie pionka przez biskupa?
+🔲  Fala odpychająca króla?
+🔲  Sniperka wieży?
+🔲  Święta droga jakoś fajnie pojawiająca się i łamiąca się?
 🔲  
 
-Boss nr 2: Przepisywanie + dodanie multiplayer i animacji
-🔲  Przepisać pliki z javy na C# tak by projekt się uruchamiał i działał
-🔲  Implementacja multiplayera
-🔲  Animacje
+2.4  Dodatkowe mody
+🔲  Blind mode for the dear friend of ours
+🔲  Cannibalism mode for halloween
+🔲  
