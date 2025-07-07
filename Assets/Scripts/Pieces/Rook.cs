@@ -20,26 +20,25 @@ namespace Pieces
         /// </summary>
         public override bool IsValidMove(int newRow, int newCol)
         {
-            // Poza plansz¹?
+            // Out of the board?
             if (!board.IsValidPosition(newRow, newCol))
                 return false;
 
-            // Ruch musi byæ w tym samym wierszu lub kolumnie
+            // The same column or row or no move
             if (newRow != Row && newCol != Col)
                 return false;
 
-            // Nie przesuwamy siê o zero
+            // Can't move by 0
             if (newRow == Row && newCol == Col)
                 return false;
 
-            // Krok ruchu: -1, 0 lub 1
             int rowStep = Math.Sign(newRow - Row);
             int colStep = Math.Sign(newCol - Col);
 
             int currentRow = Row + rowStep;
             int currentCol = Col + colStep;
 
-            // Sprawdzamy œcie¿kê, czy nie blokuje nas ¿adna figura
+            // See if nothing blocks the move, no interception in the middle
             while (currentRow != newRow || currentCol != newCol)
             {
                 if (board.GetPieceAt(currentRow, currentCol) != null)
@@ -49,7 +48,7 @@ namespace Pieces
                 currentCol += colStep;
             }
 
-            // Cel: pole jest puste lub stoi na nim figura przeciwnika
+            // No piece at the target square or a piece of the opposite team -> can move
             Piece target = board.GetPieceAt(newRow, newCol);
             return target == null || target.Team != Team;
         }

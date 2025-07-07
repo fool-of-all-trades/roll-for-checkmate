@@ -53,10 +53,10 @@ namespace Pieces
 
         public void Init(ChessBoard boardCtx, int startRow, int startCol, bool team)
         {
-            // store the board context so all your IsValidMove calls still work
+            // store the board context so all IsValidMove calls still work
             this.board = boardCtx;
 
-            // set the grid coords + move the transform for you
+            // set the grid coords + move the transform
             this.Row = startRow;
             this.Col = startCol;
             this.Team = team;

@@ -1,25 +1,25 @@
 using Pieces;
 using Controller;
 
-//King (level 3, zbicie daje zwyciêstwo):
-//Bazowa umiejêtnoœæ: Jednorazowa ale bez potrzeby levelowania
+//King (level 3):
+//Base Ability: one time, no leveling up required
 //
-//Queen (level 3, zbicie daje +3 level):
-//Bazowa umiejêtnoœæ: jednorazowa, nie wymaga levelowania, automatycznie dzia³a po œmierci
+//Queen (level 3, capture gives +3 level):
+//Base Ability: one time, no leveling up required, works automatically after death
 //
-//Bishop (level 2, zbicie daje +2 level):
-//Bazowa umiejêtnoœæ: passive, triggered when conditions are met, no cooldown
-//Ultimate: raz na levelu 5
+//Bishop (level 2, capture gives +2 level):
+//Base Ability: passive, triggered when conditions are met, no cooldown
+//Ultimate: once on level 5
 //
-//Knight (level 2, zbicie daje +2 level):
-//Bazowa umiejêtnoœæ: passive, triggered when conditions are met, no cooldown
-//Ultimate: raz na levelu 5
+//Knight (level 2, capture gives +2 level):
+//Base Ability: passive, triggered when conditions are met, no cooldown
+//Ultimate: once on level 5
 //
-//Rook (level 2, zbicie daje +2 level):
-//Bazowa umiejêtnoœæ: passive, triggered when conditions are met, no cooldown
-//Ultimate: raz na levelu 5
+//Rook (level 2, capture gives +2 level):
+//Base Ability: passive, triggered when conditions are met, no cooldown
+//Ultimate: once on level 5
 //
-//Piece (level 1, zbicie daje +1 level): nothing for now
+//Piece (level 1, capture gives +1 level): nothing for now
 
 namespace Abilities
 {

@@ -10,35 +10,28 @@ public class GameManager : MonoBehaviour
 
     private void Awake()
     {
-        // klasyczny wzorzec singletonu — zostajemy, jeœli nikt inny jeszcze nie istnieje
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
         }
         Instance = this;
-        // by GameManager przetrwa³ prze³adowanie scen
+
+        // so that the GameManager persists across scene loads
         DontDestroyOnLoad(gameObject);
     }
 
     private void Start()
     {
-        // pomijamy TitleScreen na razie
+        // skipping TitleScene for now
         LoadBoard();
     }
 
-    /// <summary>
-    /// Prze³¹cza na scenê z plansz¹ szachów
-    /// Dodaæ j¹ trzeba do Build Settings pod t¹ nazw¹
-    /// </summary>
     public void LoadBoard()
     {
         SceneManager.LoadScene("BoardScene");
     }
 
-    /// <summary>
-    /// Koñczy grê – wraca do sceny tytu³owej i resetuje stan w GameControllerze
-    /// </summary>
     public void EndGame()
     {
         SceneManager.LoadScene("TitleScene");

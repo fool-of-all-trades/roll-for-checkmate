@@ -14,7 +14,7 @@ namespace Utils
         /// <returns>Random integer between 1 and sides, inclusive.</returns>
         public static int Roll(int sides)
         {
-            // UnityEngine.Random.Range(min, max) returns [min, max) for ints, so we use sides + 1.
+            // <min, max)
             return Random.Range(1, sides + 1);
         }
     }
