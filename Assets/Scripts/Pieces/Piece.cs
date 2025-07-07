@@ -83,7 +83,7 @@ namespace Pieces
 
         public void UpdateLevel(int delta)
         {
-            level = Mathf.Clamp(level + delta, 1, 5);
+            level += delta;
         }
 
         public void SetCursedTurns(int t) => cursedTurns = t;

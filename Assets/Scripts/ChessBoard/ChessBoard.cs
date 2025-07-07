@@ -43,8 +43,14 @@ public class ChessBoard : MonoBehaviour
 
     [Header("Board Highlights")]
     public Color highlightColor;
-    public Color whiteRoadColor;
-    public Color blackRoadColor;
+    public Color whiteSacredRoadColor;
+    public Color blackSacredRoadColor;
+
+    [Header("Board & Highlights")]
+    [SerializeField] private Tilemap highlightTilemap;
+    [SerializeField] private Tilemap whiteSacredRoadTilemap;
+    [SerializeField] private Tilemap blackSacredRoadTilemap;
+    [SerializeField] private Tile highlightTile;
 
     private Vector2Int enPassantTile = new Vector2Int(-1, -1);
     private Piece selectedPiece;
@@ -88,6 +94,42 @@ public class ChessBoard : MonoBehaviour
         }
     }
 
+    #region Highlights
+    /// <summary>
+    /// Clears all three overlay layers.
+    /// </summary>
+    public void ClearHighlights()
+    {
+        highlightTilemap.ClearAllTiles();
+        whiteSacredRoadTilemap.ClearAllTiles();
+        blackSacredRoadTilemap.ClearAllTiles();
+    }
+
+    /// <summary>
+    /// Call this after ActivateSacredRoad on GameController.
+    /// </summary>
+    public void ShowSacredRoads(List<Vector2Int> whiteRoad, List<Vector2Int> blackRoad)
+    {
+        // first clear any old highlights/roads
+        ClearHighlights();
+
+        // white road squares
+        foreach (var sq in whiteRoad)
+        {
+            var cell = new Vector3Int(sq.y, sq.x, 0);
+            whiteSacredRoadTilemap.SetTile(cell, highlightTile);
+        }
+
+        // black road squares
+        foreach (var sq in blackRoad)
+        {
+            var cell = new Vector3Int(sq.y, sq.x, 0);
+            blackSacredRoadTilemap.SetTile(cell, highlightTile);
+        }
+    }
+    #endregion
+
+    // Yeah I'll get to that soon, I promise! 07.07.2025
     #region IBoardContext Implementation
     public bool IsValidPosition(int row, int col)
     {
@@ -349,23 +391,6 @@ public class ChessBoard : MonoBehaviour
         return path;
     }
 
-    private void HandleExtraMove(Piece bonus, int row, int col)
-    {
-        // Skip extra move if clicked on the same square
-        if (bonus.Row == row && bonus.Col == col)
-        {
-            gameController.ClearSacredRoad(bonus.Team);
-            gameController.ToggleTurn();
-        }
-        // Otherwise perform extra move if valid
-        else if (bonus.IsValidMove(row, col))
-        {
-            MovePiece(bonus, row, col);
-            gameController.ClearSacredRoad(bonus.Team);
-            gameController.ToggleTurn();
-        }
-    }
-
     private void OnUltimateButtonClicked()
     {
         Debug.Log("[UI] Ultimate button clicked!");
@@ -383,13 +408,13 @@ public class ChessBoard : MonoBehaviour
 
     private void UpdateUI()
     {
-        rollText.text = roll.ToString();
+        rollText.text = "Roll: " + roll.ToString();
         if (infoPiece != null)
         {
             infoPanel.SetActive(true);
             infoNameText.text = infoPiece.Name;
-            infoTeamText.text = infoPiece.Team ? "White" : "Black";
-            infoLevelText.text = infoPiece.Level.ToString();
+            infoTeamText.text = infoPiece.Team ? "Team: White" : "Team: Black";
+            infoLevelText.text = "Level: " + infoPiece.Level.ToString();
             infoSpriteImage.sprite = infoPiece.GetComponent<SpriteRenderer>().sprite;
         }
         else

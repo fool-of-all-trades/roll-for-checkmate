@@ -29,6 +29,7 @@ namespace Controller
         private Piece blackRoadOwner;
         private int blackRoadUses;
 
+
         /// <summary>
         /// Squares highlighted for White's sacred road when in use.
         /// </summary>
@@ -285,6 +286,11 @@ namespace Controller
                 blackRoadUses = 1;
             }
             Debug.Log($"Sacred road for {(team ? "White" : "Black")} [{path.Count} squares]");
+
+            ChessBoard.Instance.ShowSacredRoads(
+              WhiteRoadSquares,
+              BlackRoadSquares
+            );
         }
 
         /// <summary>
