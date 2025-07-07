@@ -40,12 +40,22 @@ namespace Abilities
                 else
                     Debug.Log("Ultimate ability: Coœ posz³o nie tak");
             }
-            else
+            else if(roll<=19)
             {
                 // High roll: bonus resurrection
-                bool success = controller.ResurrectPawn(owner.Team);
+                bool success = controller.ResurrectPiece(owner.Team);
                 if (success)
-                    Debug.Log("Ultimate ability: No way, uda³o siê wskrzesiæ i to jeszcze z dodatkow¹ umiejêtnoœci¹");
+                    Debug.Log("Ultimate ability: No way, uda³o siê wskrzesiæ i to jeszcze co");
+                else
+                    Debug.Log("Ultimate ability: Coœ posz³o nie tak");
+            }
+            else
+            {
+                // Nat 20: resurrect a legendary piece (with some crazy ass ability)
+                // For now only in plans
+                bool success = controller.ResurrectPiece(owner.Team);
+                if (success)
+                    Debug.Log("Ultimate ability: No way, uda³o siê wskrzesiæ i to jeszcze co");
                 else
                     Debug.Log("Ultimate ability: Coœ posz³o nie tak");
             }

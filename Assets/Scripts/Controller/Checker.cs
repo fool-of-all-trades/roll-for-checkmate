@@ -176,7 +176,7 @@ namespace Controller
             piece.SetGridPosition(destRow, destCol);
             if (captured != null)
             {
-                board.RemovePiece(captured);
+                board.HideCapturedPiece(captured);
             }
                 
 
@@ -187,6 +187,7 @@ namespace Controller
             if (captured != null)
             {
                 board.AddPiece(captured);
+                captured.gameObject.SetActive(true);
             }
 
             return result;

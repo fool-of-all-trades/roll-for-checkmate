@@ -60,14 +60,19 @@ namespace Pieces
             this.Row = startRow;
             this.Col = startCol;
             this.Team = team;
-            spriteRenderer.sprite = this.Team ? whiteSprite : blackSprite;
+
+            if (spriteRenderer != null)
+                spriteRenderer.sprite = this.Team ? whiteSprite : blackSprite;
+
             SetGridPosition(startRow, startCol);
         }
 
         public void ChangeTeam(bool newTeam)
         {
             team = newTeam;
-            spriteRenderer.sprite = team ? whiteSprite : blackSprite;
+
+            if (spriteRenderer != null)
+                spriteRenderer.sprite = team ? whiteSprite : blackSprite;
         }
 
         public void MarkMoved() => hasMoved = true;

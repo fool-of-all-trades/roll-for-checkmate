@@ -136,6 +136,12 @@ public class ChessBoard : MonoBehaviour
         Destroy(piece.gameObject);
     }
 
+    public void HideCapturedPiece(Piece piece)
+    {
+        pieces.Remove(piece);
+        piece.gameObject.SetActive(false);
+    }
+
     /// <summary>
     /// Add a piece back into the board’s piece list.
     /// </summary>

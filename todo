@@ -34,6 +34,8 @@ Boss nr 1: Setup i przygotowanie projektu
 🔲  Stworzyć scenę początkową/title screen
 🔲  Stworzyć przejście między scenami
 🔲  Podświetlanie możliwych do wyboru pól
+🔲  Podświetlanie świętej ścieżki
+🔲  Ładniejsze wyświetlanie info
 
 1.5 Przepisać pliki z pionkami:
 ✅  Bishop
@@ -64,6 +66,11 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Pionki
 ✅  GameManager
 ✅  ChessBoard
+
+1.8.2 Nieprzewidziane zjazdy z autostrady:
+✅  Naprawić wskrzeszanie pionków przez biskupa
+🔲  
+🔲  
 
 1.9 Gra działa?
 🔲  Działa

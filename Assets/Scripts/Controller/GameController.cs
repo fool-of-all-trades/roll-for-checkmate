@@ -1,7 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using Pieces;
 using Controller;
+using System.Linq;
 
 namespace Controller
 {
@@ -110,7 +111,7 @@ namespace Controller
             if (captured.Team) whiteCaptured.Add(captured);
             else blackCaptured.Add(captured);
 
-            ChessBoard.Instance.RemovePiece(captured);
+            ChessBoard.Instance.HideCapturedPiece(captured);
 
             // Level up winner (max level 5)
             if (winner.Level < 5)
@@ -341,61 +342,120 @@ namespace Controller
         }
         #endregion
 
-        #region PawnRessurection
+        #region Resurrection
         /// <summary>
-        /// Returns the first available square for pawn resurrection for the specified team, or null if none.
+        /// Pick the best square to resurrect a pawn for the given team:
+        ///  - only rows 0–3 for White, 4–7 for Black
+        ///  - only empty cells
+        ///  - sorted by closeness to your back‐rank (row 0 for White, row 7 for Black)
+        ///  - tie-breaker: pick the column closest to the board center
         /// </summary>
         public Vector2Int? GetResurrectionSquare(bool team)
         {
+            int backRank = team ? 0 : 7;
+            int rowMin = team ? 0 : 4;
+            int rowMax = team ? 3 : 7;
             var candidates = new List<Vector2Int>();
-            if (team)
+
+            // gather all empty cells in the allowed rows
+            for (int r = rowMin; r <= rowMax; r++)
+                for (int c = 0; c < 8; c++)
+                {
+                    if (ChessBoard.Instance.GetPieceAt(r, c) == null)
+                        candidates.Add(new Vector2Int(r, c));
+                }
+
+            if (candidates.Count == 0)
+                return null;
+
+            // sort by:
+            //  1) row distance to backRank (smaller = closer to proper side)
+            //  2) column distance to center (3.5) to favour the middle files
+            candidates.Sort((a, b) =>
             {
-                // White resurrection rows 0-2
-                for (int row = 0; row < 3; row++)
-                    for (int col = 0; col < 8; col++)
-                        if (ChessBoard.Instance.GetPieceAt(row, col) == null)
-                            candidates.Add(new Vector2Int(row, col));
-            }
-            else
-            {
-                // Black resurrection rows 5-7
-                for (int row = 5; row < 8; row++)
-                    for (int col = 0; col < 8; col++)
-                        if (ChessBoard.Instance.GetPieceAt(row, col) == null)
-                            candidates.Add(new Vector2Int(row, col));
-            }
-            return candidates.Count > 0 ? (Vector2Int?)candidates[0] : null;
+                int da = Mathf.Abs(a.x - backRank);
+                int db = Mathf.Abs(b.x - backRank);
+                if (da != db) return da.CompareTo(db);
+
+                float ca = Mathf.Abs(a.y - 3.5f);
+                float cb = Mathf.Abs(b.y - 3.5f);
+                return ca.CompareTo(cb);
+            });
+
+            return candidates[0];
         }
 
         /// <summary>
-        /// Resurrects a pawn for the specified team at the first available resurrection square.
+        /// Pulls a captured pawn (if any) from the pool, flips its team,
+        /// finds the best square and reactivates & places it.
         /// </summary>
         public bool ResurrectPawn(bool team)
         {
-            var square = GetResurrectionSquare(team);
-            if (!square.HasValue)
+            // find the square
+            var sq = GetResurrectionSquare(team);
+            if (!sq.HasValue)
             {
                 Debug.Log("No space available to resurrect a pawn.");
                 return false;
             }
 
-            var capturedList = team ? whiteCaptured : blackCaptured;
-            for (int i = 0; i < capturedList.Count; i++)
+            // pick a pawn out of the captured list
+            var pool = team ? whiteCaptured : blackCaptured;
+            for (int i = 0; i < pool.Count; i++)
             {
-                var piece = capturedList[i];
-                if (piece is Pawn)
+                var pawn = pool[i];
+                if (pawn is Pawn)
                 {
-                    capturedList.RemoveAt(i);
-                    piece.ChangeTeam(team);
-                    piece.SetGridPosition(square.Value.x, square.Value.y);
-                    ChessBoard.Instance.pieces.Add(piece);
-                    Debug.Log($"{piece.Name} resurrected at ({square.Value.x}, {square.Value.y})");
+                    pool.RemoveAt(i);
+
+                    // 1) Reactivate & flip team/sprite
+                    pawn.ChangeTeam(team);
+                    pawn.gameObject.SetActive(true);
+
+                    // 2) Move it onto the board and re-add
+                    pawn.SetGridPosition(sq.Value.x, sq.Value.y);
+                    ChessBoard.Instance.AddPiece(pawn);
+
+                    Debug.Log($"{pawn.Name} resurrected at ({sq.Value.x}, {sq.Value.y}) for {(team ? "White" : "Black")}");
                     return true;
                 }
             }
 
-            Debug.Log("No pawn in captured list to resurrect.");
+            Debug.Log("No pawn in the captured pool to resurrect.");
             return false;
+        }
+
+        public bool ResurrectPiece(bool team)
+        {
+            // find the square
+            var sq = GetResurrectionSquare(team);
+            if (!sq.HasValue)
+            {
+                Debug.Log("No space available to resurrect a piece.");
+                return false;
+            }
+
+            var pool = team ? whiteCaptured : blackCaptured;
+            var piecesToResurrect = pool.Where(p => p is not Pawn).ToList();
+
+            if (piecesToResurrect.Count > 0)
+            {
+                var piece = piecesToResurrect[Random.Range(0, piecesToResurrect.Count)];
+                pool.Remove(piece);
+
+                piece.ChangeTeam(team);
+                piece.gameObject.SetActive(true);
+
+                piece.SetGridPosition(sq.Value.x, sq.Value.y);
+                ChessBoard.Instance.AddPiece(piece);
+
+                Debug.Log($"{piece.Name} resurrected at ({sq.Value.x}, {sq.Value.y}) for {(team ? "White" : "Black")}");
+                return true;
+            }
+
+            Debug.Log("No piece in the captured pool to resurrect.");
+            Debug.Log("Trying to resurrect a pawn...");
+            return ResurrectPawn(team);
         }
         #endregion
     }
