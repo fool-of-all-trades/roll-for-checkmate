@@ -944,7 +944,7 @@ GameObject:
   - component: {fileID: 907421532}
   - component: {fileID: 907421531}
   m_Layer: 5
-  m_Name: Panel
+  m_Name: Info panel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1842,9 +1842,12 @@ MonoBehaviour:
   infoTeamText: {fileID: 525111627}
   infoLevelText: {fileID: 874060796}
   infoSpriteImage: {fileID: 1781197936}
-  highlightColor: {r: 1, g: 0.96891016, b: 0.4481132, a: 0}
-  whiteRoadColor: {r: 1, g: 0, b: 0.266963, a: 0}
-  blackRoadColor: {r: 0.20908546, g: 0, b: 1, a: 0}
+  highlightColor: {r: 1, g: 0.97136354, b: 0.495283, a: 1}
+  whiteSacredRoadColor: {r: 0.9527337, g: 0.5896226, b: 1, a: 1}
+  blackSacredRoadColor: {r: 0.41960788, g: 1, b: 0.9836229, a: 1}
+  highlightTilemap: {fileID: 0}
+  whiteSacredRoadTilemap: {fileID: 0}
+  blackSacredRoadTilemap: {fileID: 0}
 --- !u!4 &1215510239
 Transform:
   m_ObjectHideFlags: 0
@@ -1961,7 +1964,7 @@ GameObject:
   - component: {fileID: 1781197937}
   - component: {fileID: 1781197936}
   m_Layer: 5
-  m_Name: Panel
+  m_Name: Piece image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

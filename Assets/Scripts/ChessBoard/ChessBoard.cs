@@ -50,7 +50,6 @@ public class ChessBoard : MonoBehaviour
     [SerializeField] private Tilemap highlightTilemap;
     [SerializeField] private Tilemap whiteSacredRoadTilemap;
     [SerializeField] private Tilemap blackSacredRoadTilemap;
-    [SerializeField] private Tile highlightTile;
 
     private Vector2Int enPassantTile = new Vector2Int(-1, -1);
     private Piece selectedPiece;
@@ -106,30 +105,18 @@ public class ChessBoard : MonoBehaviour
     }
 
     /// <summary>
-    /// Call this after ActivateSacredRoad on GameController.
+    /// TODO: Highlights the given tile
     /// </summary>
     public void ShowSacredRoads(List<Vector2Int> whiteRoad, List<Vector2Int> blackRoad)
     {
-        // first clear any old highlights/roads
-        ClearHighlights();
 
-        // white road squares
-        foreach (var sq in whiteRoad)
-        {
-            var cell = new Vector3Int(sq.y, sq.x, 0);
-            whiteSacredRoadTilemap.SetTile(cell, highlightTile);
-        }
+        Debug.Log($"[Highlights] ShowSacredRoads called — whiteRoad:{whiteRoad.Count}, blackRoad:{blackRoad.Count}");
 
-        // black road squares
-        foreach (var sq in blackRoad)
-        {
-            var cell = new Vector3Int(sq.y, sq.x, 0);
-            blackSacredRoadTilemap.SetTile(cell, highlightTile);
-        }
+
     }
     #endregion
 
-    // Yeah I'll get to that soon, I promise! 07.07.2025
+    // Yeah I'll get to that soon, said on 07.07.2025
     #region IBoardContext Implementation
     public bool IsValidPosition(int row, int col)
     {
