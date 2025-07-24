@@ -79,18 +79,23 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Chyba?
 
 Boss nr 2: Dodanie multiplayer i animacji i modów
-2.1 Rozbić duże pliki:
+2.1 Refaktoryzacja:
+✅  Pozbyć się singletonów
+✅  Przejść na eventy by nie mieć circular dependency (głównie chodzi o relacje między ChessBoard i GameController)
+✅  Wprowadzić DTO do przesyłania danych
+
+2.2 Rozbić duże pliki:
 🔲  ChessBoard
 🔲  GameController
 
-2.2  Implementacja multiplayera
+2.3  Implementacja multiplayera
 🔲  Wybrać rozwiązanie (Photon PUN2 / Mirror + Steam P2P / UGS)
 🔲  Zainstalować pakiet i skonfigurować
 🔲  Stworzyć NetworkManager.cs z metodami Host()/Join()
 🔲  Dodać NetworkedPiece.cs (RPC Move, SyncVar Team/Position)
 🔲  Test: dwa klienty w edytorze łączą się i synchronizują ruch
 
-2.3  Animacje
+2.4  Animacje
 🔲  Mini duszek królowej unoszący się koło przeklętego pionka?
 🔲  Transformacja drużyny pionka przez świętą drogę księdza?
 🔲  Wskrzeszanie pionka przez biskupa?
@@ -99,7 +104,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 🔲  Święta droga jakoś fajnie pojawiająca się i łamiąca się?
 🔲  
 
-2.4  Dodatkowe mody
+2.5  Dodatkowe mody
 🔲  Blind mode for the dear friend of ours
 🔲  Cannibalism mode for halloween
 🔲  
