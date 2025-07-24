@@ -15,7 +15,7 @@ namespace Abilities
         {
         }
 
-        public override void UseAbility(GameController controller, Piece owner)
+        public override void UseAbility(IGameController controller, Piece owner)
         {
             if (usedUltimate)
             {

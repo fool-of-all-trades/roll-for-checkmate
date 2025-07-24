@@ -64,8 +64,8 @@ namespace Pieces
                 // We check each square from current to destination + one beyond
                 for (int c = Col; c != newCol + direction; c += direction)
                 {
-                    if (GameController.Instance.CheckCheck(this, Row, c))
-                        return false;
+                    //if (GameController.Instance.CheckCheck(this, Row, c))
+                    //    return false;
                 }
 
                 return true;

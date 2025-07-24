@@ -51,6 +51,15 @@ namespace Pieces
             transform.position = board.GridToWorld(newRow, newCol);
         }
 
+        // Inside your Piece class
+        public void SetBoardCoords(int r, int c)
+        {
+            row = r;
+            col = c;
+            // or Row = r; Col = c;  (both work because you're inside the same class)
+        }
+
+
         public void Init(ChessBoard boardCtx, int startRow, int startCol, bool team)
         {
             // store the board context so all IsValidMove calls still work
@@ -90,13 +99,13 @@ namespace Pieces
         #endregion
 
         #region Abilities
-        public void UseBaseAbility(GameController controller)
+        public void UseBaseAbility(IGameController controller)
         {
             if (baseAbility != null && cursedTurns == 0)
                 baseAbility.UseAbility(controller, this);
         }
 
-        public void UseUltimateAbility(GameController controller)
+        public void UseUltimateAbility(IGameController controller)
         {
             if (CanUseUltimate())
                 ultimateAbility.UseAbility(controller, this);

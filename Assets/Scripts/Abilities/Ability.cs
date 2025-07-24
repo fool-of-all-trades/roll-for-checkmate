@@ -52,6 +52,6 @@ namespace Abilities
         /// </summary>
         /// <param name="controller">Reference to the GameController managing the game.</param>
         /// <param name="owner">The piece invoking the ability.</param>
-        public abstract void UseAbility(GameController controller, Piece owner);
+        public abstract void UseAbility(IGameController controller, Piece owner);
     }
 }

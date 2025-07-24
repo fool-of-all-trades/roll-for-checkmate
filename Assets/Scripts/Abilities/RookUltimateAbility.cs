@@ -13,7 +13,7 @@ namespace Abilities
         {
         }
 
-        public override void UseAbility(GameController controller, Piece owner)
+        public override void UseAbility(IGameController controller, Piece owner)
         {
             ChessBoard board = owner.board;
             int ownerRow = owner.Row;
@@ -71,7 +71,7 @@ namespace Abilities
             if (target != null)
             {
                 // Remove and capture the target
-                board.RemovePiece(target);
+                //board.RemovePiece(target);
                 controller.CapturePiece(target, owner);
 
                 // Teleport code commented out for future use:

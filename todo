@@ -72,6 +72,7 @@ Boss nr 1: Setup i przygotowanie projektu
 🔲  Naprawić że po tym jak król umiera nie ma game over
 ✅  Sprawdzić czy sacred road wogóle działa (spoiler alert, nie działał, ale już działa)
 🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca)
+🔲  2 Audio Listenery są no bo każda ze scen ma kamerę i każda z kamer listener, Unity to przeszkadza
 
 1.9 Gra działa?
 🔲  Działa
