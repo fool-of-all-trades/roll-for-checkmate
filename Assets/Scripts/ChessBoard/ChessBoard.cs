@@ -39,11 +39,12 @@ public class ChessBoard : MonoBehaviour
     private Piece infoPiece;
 
     [Header("References")]
-    [SerializeField] private MonoBehaviour controllerRoot;   // drag GameControllerMono here at edit-time
+    [SerializeField] private MonoBehaviour controllerRoot; 
     private IGameController controller;
 
     private void Awake()
     {
+        // subscribe to controller events
         controller = (IGameController)controllerRoot; 
 
         controller.OnMoveAccepted += ApplyMoveVisuals;
@@ -98,16 +99,6 @@ public class ChessBoard : MonoBehaviour
     {
         Vector3Int cellPos = new Vector3Int(col, row, 0);
         return boardTilemap.GetCellCenterWorld(cellPos);
-    }
-
-
-    public bool CanMove(Piece piece, int destRow, int destCol)
-    {
-        if (!piece.IsValidMove(destRow, destCol))
-            return false;
-
-        // Assuming you have a reference to your GameController:
-        return !controller.CheckCheck(piece, destRow, destCol);
     }
 
     public void HideCapturedPiece(Piece piece)
@@ -167,8 +158,6 @@ public class ChessBoard : MonoBehaviour
         // hide the loser if there was a capture
         if (m.Captured != null) HideCapturedPiece(m.Captured);
 
-        // optional: clear last roll and refresh UI
-        //roll = 0;
         UpdateUI();
     }
 
