@@ -73,6 +73,7 @@ namespace Controller
             validator = new MoveValidator(turnMgr, PieceAt, checker, GetKing, this);
 
             duels = (IDuelService)duelServiceRoot;
+            duels.Init(PieceAt, GetKing, queensCurse);
             queensCurse = (ICurseService)curseServiceRoot;
         }
 
@@ -91,22 +92,16 @@ namespace Controller
 
             if (target != null && target.Team != piece.Team)
             {
-                bool attackerWins;
-
                 // Need a duel only if defender's level is higher
                 if (target.Level > piece.Level)
                 {
-                    attackerWins = duels.ResolveDuel(piece, target, out int roll);
-                    OnDuelRolled?.Invoke(roll);
+                    var duelResult = duels.ResolveDuel(piece, target);
+                    OnDuelRolled?.Invoke(duelResult.RawRoll);
 
-                    if (!attackerWins)
+                    if (!duelResult.AttackerWon)
                     {
                         // Attacker died, defender survives – turn ends here
                         captureManager.CapturePiece(pieces, piece, target);   // defender levels up
-
-                        // Queen's Curse: attacker loses 3 turns
-                        if (target is Queen)
-                            queensCurse.ApplyCurse(piece, 6);  // 6 half-moves = 3 full turns
 
                         turnMgr.ToggleTurn();
                         queensCurse.TickTurn();
@@ -114,19 +109,13 @@ namespace Controller
                     }
                     // else fall through: attacker wins, defender captured
                 }
-                else
-                {
-                    attackerWins = true;   // auto‑capture
-                }
 
-                if (attackerWins)
-                {
-                    captureManager.CapturePiece(pieces, target, piece);       // attacker levels up
-                    captured = target;           // for MoveResult
-                                                 // Queen's Curse: attacker loses 3 turns
-                    if (target is Queen)
-                        queensCurse.ApplyCurse(piece, 6);  // 6 half-moves = 3 full turns
-                }
+                // Auto-capture or attacker won duel
+                captureManager.CapturePiece(pieces, target, piece);       // attacker levels up
+                captured = target;           // for MoveResult
+
+                if (target is Queen)
+                    queensCurse.ApplyCurse(piece, 6);
             }
 
 

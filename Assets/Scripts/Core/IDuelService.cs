@@ -1,10 +1,21 @@
 using Pieces;
+using System;
 public interface IDuelService
 {
-    /// <summary>
-    /// Returns <c>true</c> if the attacker wins the duel and captures,
-    /// <c>false</c> if the defender wins and the attacker is captured.
-    /// Implementations should encapsulate the dice roll and any UI feedback.
-    /// </summary>
-    bool ResolveDuel(Piece attacker, Piece defender, out int roll);
+
+    public void Init(Func<int, int, Piece> pieceAt,
+                     Func<bool, Piece> getKing,
+                     ICurseService curses = null);
+    DuelResult ResolveDuel(Piece attacker, Piece defender);
+}
+
+public readonly struct DuelResult
+{
+    public readonly bool AttackerWon;
+    public readonly int RawRoll;
+    public readonly int EffectiveRoll;
+    public DuelResult(bool won, int raw, int eff)
+    {
+        AttackerWon = won; RawRoll = raw; EffectiveRoll = eff;
+    }
 }
