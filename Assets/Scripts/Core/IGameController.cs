@@ -43,6 +43,6 @@ public interface IGameController
 
 
     // REMOVE LATER
-    bool IsWhiteTurn { get; }              
-
+    bool IsWhiteTurn { get; }
+    public void CapturePiece(Piece captured, Piece winner);
 }

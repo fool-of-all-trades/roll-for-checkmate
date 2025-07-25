@@ -179,5 +179,10 @@ namespace Controller
         // expose current side
         public bool IsWhiteTurn => turnMgr.WhiteTurn;
 
+        // GameControllerMono.cs
+        public void CapturePiece(Piece captured, Piece winner)
+            => captureManager.CapturePiece(pieces, captured, winner);
+
+
     }
 }
