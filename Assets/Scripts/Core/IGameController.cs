@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Pieces;
 using System;
+using UnityEngine;
 
 /// <summary>
 /// Facade for chess-rule logic.  Exposes just enough for
@@ -16,6 +17,8 @@ public interface IGameController
     event Action<MoveResult> OnMoveAccepted;
 
     event Action<int> OnDuelRolled;
+
+    event Action<IReadOnlyList<Vector2Int>, IReadOnlyList<Vector2Int>> OnRoadsChanged;
 
     /// <summary>
     /// Attempts to move <paramref name="piece"/> to the target

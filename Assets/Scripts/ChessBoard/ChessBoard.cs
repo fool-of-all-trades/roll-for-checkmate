@@ -49,6 +49,7 @@ public class ChessBoard : MonoBehaviour
 
         controller.OnMoveAccepted += ApplyMoveVisuals;
         controller.OnDuelRolled += ShowRoll;
+        controller.OnRoadsChanged += ShowRoads;
     }
 
     private void Start()
@@ -233,6 +234,11 @@ public class ChessBoard : MonoBehaviour
     private void ShowRoll(int value)
     {
         rollText.text = $"Rolled: {value}";
+    }
+
+    void ShowRoads(IReadOnlyList<Vector2Int> white, IReadOnlyList<Vector2Int> black)
+    {
+        // paint tiles, show highlights for sacred road
     }
 
 }

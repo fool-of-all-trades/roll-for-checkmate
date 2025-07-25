@@ -10,16 +10,23 @@ namespace Controller
     [DisallowMultipleComponent]
     public class GameControllerMono : MonoBehaviour, IGameController
     {
-        /* ───────────── IGameController contract ───────────── */
+        /* ───────────── IGameController event contracts ───────────── */
 
         public event Action<MoveResult> OnMoveAccepted;
         public event Action<int> OnDuelRolled;
+
+        public event Action<IReadOnlyList<Vector2Int>, IReadOnlyList<Vector2Int>> OnRoadsChanged
+        {
+            add => sacredRoad.OnRoadsChanged += value;
+            remove => sacredRoad.OnRoadsChanged -= value;
+        }
+
 
         /// <summary>Called once by ChessBoard in Awake to give us the live piece list.</summary>
         public void Initialize(IEnumerable<Piece> allPieces) =>
             pieces = new List<Piece>(allPieces);
 
-       
+        
         public Piece PieceAt(int row, int col) =>
             pieces.FirstOrDefault(p => p.Row == row && p.Col == col);
 
@@ -66,6 +73,9 @@ namespace Controller
         [SerializeField] private MonoBehaviour curseServiceRoot;
         ICurseService queensCurse;
 
+        [SerializeField] MonoBehaviour sacredRoadRoot;
+        ISacredRoadService sacredRoad;
+
         void Awake()
         {
             checker = new Checker(PieceAt);
@@ -75,6 +85,7 @@ namespace Controller
             duels = (IDuelService)duelServiceRoot;
             duels.Init(PieceAt, GetKing, queensCurse);
             queensCurse = (ICurseService)curseServiceRoot;
+            sacredRoad = (ISacredRoadService)sacredRoadRoot;
         }
 
         public bool TryMove(Piece piece, int toRow, int toCol)
@@ -139,6 +150,13 @@ namespace Controller
             piece.SetBoardCoords(toRow, toCol);
             piece.MarkMoved(); // needed for castling cuz those towers do be cheating
 
+            // Bishop passive: make a new sacred path on every bishop move
+            if (piece is Bishop)
+            {
+                var path = BuildBishopPath(fromRow, fromCol, toRow, toCol);
+                sacredRoad.ActivateRoad(piece, path);   // replaces old road for that team
+            }
+
             // set new en‑passant square if pawn double‑stepped
             if (piece is Pawn p && Math.Abs(toRow - fromRow) == 2)
             {
@@ -166,6 +184,8 @@ namespace Controller
             }
 
             // TODO: promotion UI / replacement here
+
+            sacredRoad.ProcessMove(piece);
 
             turnMgr.ToggleTurn();          // flip side & clear old en‑passant square
             queensCurse.TickTurn(); 
@@ -198,6 +218,20 @@ namespace Controller
             OnMoveAccepted?.Invoke(new MoveResult(piece, fromRow, fromCol, toRow, toCol));
             return true;
         }
+
+        List<Vector2Int> BuildBishopPath(int fr, int fc, int tr, int tc)
+        {
+            var list = new List<Vector2Int>();
+            int dr = Math.Sign(tr - fr);
+            int dc = Math.Sign(tc - fc);
+
+            // squares BETWEEN start and end (exclude both ends)
+            for (int r = fr + dr, c = fc + dc; r != tr && c != tc; r += dr, c += dc)
+                list.Add(new Vector2Int(r, c));
+
+            return list;
+        }
+
 
     }
 }
