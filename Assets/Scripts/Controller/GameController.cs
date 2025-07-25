@@ -3,6 +3,7 @@ using UnityEngine;
 using Pieces;
 using System.Linq;
 using System;
+using System.Reflection;
 
 namespace Controller
 {
@@ -62,6 +63,9 @@ namespace Controller
         [SerializeField] private MonoBehaviour duelServiceRoot;  // drag in Inspector
         IDuelService duels;
 
+        [SerializeField] private MonoBehaviour curseServiceRoot;
+        ICurseService queensCurse;
+
         void Awake()
         {
             checker = new Checker(PieceAt);
@@ -69,6 +73,7 @@ namespace Controller
             validator = new MoveValidator(turnMgr, PieceAt, checker, GetKing, this);
 
             duels = (IDuelService)duelServiceRoot;
+            queensCurse = (ICurseService)curseServiceRoot;
         }
 
         public bool TryMove(Piece piece, int toRow, int toCol)
@@ -79,7 +84,7 @@ namespace Controller
             int fromRow = piece.Row;
             int fromCol = piece.Col;
 
-            Piece captured = PieceAt(toRow, toCol);
+            Piece captured = null;
 
             // ----- resolve capture or duel BEFORE commit -----
             Piece target = PieceAt(toRow, toCol);      // might be null
@@ -98,7 +103,13 @@ namespace Controller
                     {
                         // Attacker died, defender survives – turn ends here
                         captureManager.CapturePiece(pieces, piece, target);   // defender levels up
+
+                        // Queen's Curse: attacker loses 3 turns
+                        if (target is Queen)
+                            queensCurse.ApplyCurse(piece, 6);  // 6 half-moves = 3 full turns
+
                         turnMgr.ToggleTurn();
+                        queensCurse.TickTurn();
                         return true;
                     }
                     // else fall through: attacker wins, defender captured
@@ -112,6 +123,9 @@ namespace Controller
                 {
                     captureManager.CapturePiece(pieces, target, piece);       // attacker levels up
                     captured = target;           // for MoveResult
+                                                 // Queen's Curse: attacker loses 3 turns
+                    if (target is Queen)
+                        queensCurse.ApplyCurse(piece, 6);  // 6 half-moves = 3 full turns
                 }
             }
 
@@ -165,6 +179,7 @@ namespace Controller
             // TODO: promotion UI / replacement here
 
             turnMgr.ToggleTurn();          // flip side & clear old en‑passant square
+            queensCurse.TickTurn(); 
             return true;
         }
 
@@ -175,7 +190,11 @@ namespace Controller
 
         // GameControllerMono.cs
         public void CapturePiece(Piece captured, Piece winner)
-            => captureManager.CapturePiece(pieces, captured, winner);
+        {
+            captureManager.CapturePiece(pieces, captured, winner);
+            if (captured is Queen)
+                queensCurse.ApplyCurse(winner, 6);  // 6 half-moves = 3 full turns
+        }
 
 
         // for the King's ultimate
