@@ -68,8 +68,6 @@ namespace Controller
         [SerializeField] private MonoBehaviour duelServiceRoot;  // drag in Inspector
         IDuelService duels;
 
-
-
         void Awake()
         {
             checker = new Checker(PieceAt);
@@ -87,30 +85,41 @@ namespace Controller
             int fromRow = piece.Row;
             int fromCol = piece.Col;
 
-            // ----- captures (normal target square) -----
             Piece captured = PieceAt(toRow, toCol);
-            if (captured != null &&
-                    captured.Team != piece.Team &&      // enemy
-                    captured.Level > piece.Level)       // duel required
+
+            // ----- resolve capture or duel BEFORE commit -----
+            Piece target = PieceAt(toRow, toCol);      // might be null
+
+            if (target != null && target.Team != piece.Team)
             {
-                if (!duels.ResolveDuel(piece, captured, out int roll))
+                bool attackerWins;
+
+                // Need a duel only if defender's level is higher
+                if (target.Level > piece.Level)
                 {
-                    // attacker lost
-                    captureManager.CapturePiece(pieces, piece, captured);
+                    attackerWins = duels.ResolveDuel(piece, target, out int roll);
                     OnDuelRolled?.Invoke(roll);
-                    turnMgr.ToggleTurn();
-                    return true;    // move ends here (attacker removed)
+
+                    if (!attackerWins)
+                    {
+                        // Attacker died, defender survives – turn ends here
+                        captureManager.CapturePiece(pieces, piece, target);   // defender levels up
+                        turnMgr.ToggleTurn();
+                        return true;
+                    }
+                    // else fall through: attacker wins, defender captured
                 }
                 else
                 {
-                    // attacker won
-                    captureManager.CapturePiece(pieces, captured, piece);
-                    OnDuelRolled?.Invoke(roll);
-                    // continue to commit attacker’s move below
+                    attackerWins = true;   // auto‑capture
+                }
+
+                if (attackerWins)
+                {
+                    captureManager.CapturePiece(pieces, target, piece);       // attacker levels up
+                    captured = target;           // for MoveResult
                 }
             }
-
-
 
 
             // ----- en‑passant capture BEFORE commit -----
