@@ -18,7 +18,7 @@ namespace Abilities
 
         public override void UseAbility(IGameController controller, Piece owner)
         {
-            //int roll = Dice.Roll(20);
+            int roll = Dice.Roll(20);
 
             //if (roll <= 3)
             //{

@@ -184,5 +184,18 @@ namespace Controller
             => captureManager.CapturePiece(pieces, captured, winner);
 
 
+
+        public bool TryRelocate(Piece piece, int toRow, int toCol)
+        {
+            if (PieceAt(toRow, toCol) != null) return false;
+
+            int fromRow = piece.Row;
+            int fromCol = piece.Col;
+
+            piece.SetBoardCoords(toRow, toCol);
+            OnMoveAccepted?.Invoke(new MoveResult(piece, fromRow, fromCol, toRow, toCol));
+            return true;
+        }
+
     }
 }

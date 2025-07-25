@@ -12,7 +12,7 @@ namespace Pieces
             pieceName = "Rook";
             level = 2;
 
-            ultimateAbility = new RookUltimateAbility(2);
+            ultimateAbility = new RookUltimateAbility(5);
         }
 
         /// <summary>

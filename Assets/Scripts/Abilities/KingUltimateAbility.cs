@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Controller;
 using Pieces;
+using static UnityEngine.Rendering.DebugUI.Table;
 
 namespace Abilities
 {
@@ -42,7 +43,7 @@ namespace Abilities
                 int enemyRow = kr + d[0];
                 int enemyCol = kc + d[1];
 
-                if (!board.IsValidPosition(enemyRow, enemyCol))
+                if (enemyRow < 0 && enemyRow >= 8 && enemyCol < 0 && enemyCol >= 8)
                     continue;
 
                 Piece target = board.GetPieceAt(enemyRow, enemyCol);
@@ -52,25 +53,21 @@ namespace Abilities
                     int pushRow = enemyRow + d[0] * 2;
                     int pushCol = enemyCol + d[1] * 2;
 
-                    if (board.IsValidPosition(pushRow, pushCol) && board.GetPieceAt(pushRow, pushCol) == null)
+                    if (pushRow < 0 && pushRow >= 8 && pushCol < 0 && pushCol >= 8)
+                        continue;
+
+                    if (controller.TryRelocate(target, pushRow, pushCol))
                     {
-                        target.SetGridPosition(pushRow, pushCol);
-                        Debug.Log($"Król wypycha {target.Name} na ({pushRow}, {pushCol})");
+                        Debug.Log($"King pushed {target.Name} to ({pushRow},{pushCol}).");
+                        usedUltimate = true;
                     }
                     else
                     {
-                        Debug.Log("Nie mo¿na wypchn¹æ: miejsce za jest zajête albo poza plansz¹.");
+                        Debug.Log("Nie mo¿na wypchn¹æ: miejsce za jest zajête albo poza plansz¹, albo nie ma wrogów w s¹siedztwie.");
                     }
 
-                    usedUltimate = true;
-                    pushed = true;
-                    break;
+                    return;
                 }
-            }
-
-            if (!pushed)
-            {
-                Debug.Log("Brak wrogów w s¹siedztwie, umiejêtnoœæ nie zosta³a u¿yta.");
             }
         }
     }
