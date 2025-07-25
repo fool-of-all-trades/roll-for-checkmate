@@ -72,7 +72,7 @@ namespace Abilities
             {
                 // Remove and capture the target
                 //board.RemovePiece(target);
-                controller.CapturePiece(target, owner);
+                //controller.CapturePiece(target, owner);
 
                 // Teleport code commented out for future use:
                 // owner.SetGridPosition(targetRow, targetCol);

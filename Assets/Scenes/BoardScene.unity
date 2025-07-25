@@ -151,15 +151,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77c8cb423470e1e40b34110bfcd792b6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  boardView: {fileID: 1647749365}
-  piecesParent: {fileID: 1459363816}
-  pawnPr: {fileID: 3846752607250593247, guid: 2b8c8b3fd9145d045bdc255fed06efbc, type: 3}
-  rookPr: {fileID: 3846752607250593247, guid: 591783746029d344e976dc052ac4a9bd, type: 3}
-  knightPr: {fileID: 3846752607250593247, guid: 4174d8348eeaca34f852ce0dd24b5f51, type: 3}
-  bishopPr: {fileID: 3846752607250593247, guid: 890b650f4cecb624687aec15e9d78c2d, type: 3}
-  queenPr: {fileID: 3846752607250593247, guid: 2b577e62327d89440acf7aee4d6dd19c, type: 3}
-  kingPr: {fileID: 3846752607250593247, guid: 9b2d99c9f4a5954449231fa89c1e4ef0, type: 3}
-  inputHandler: {fileID: 1917280678}
 --- !u!4 &97047587
 Transform:
   m_ObjectHideFlags: 0
@@ -1850,6 +1841,55 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!1 &1191064293
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1191064295}
+  - component: {fileID: 1191064294}
+  m_Layer: 5
+  m_Name: GameControllerMono
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1191064294
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1191064293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a66e17ac013b17844839dcf16a813d39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  whiteStarts: 1
+--- !u!224 &1191064295
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1191064293}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3279, y: 1080}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1215510237
 GameObject:
   m_ObjectHideFlags: 0
@@ -1866,7 +1906,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1215510238
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1874,7 +1914,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1215510237}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 78c19d6d2351c9e4d85793b51b3ecad7, type: 3}
   m_Name: 
@@ -1888,19 +1928,14 @@ MonoBehaviour:
   queenPrefab: {fileID: 3846752607250593247, guid: 2b577e62327d89440acf7aee4d6dd19c, type: 3}
   kingPrefab: {fileID: 3846752607250593247, guid: 9b2d99c9f4a5954449231fa89c1e4ef0, type: 3}
   pieces: []
-  ultimateButton: {fileID: 506307330}
   rollText: {fileID: 1905132258}
   infoPanel: {fileID: 907421529}
   infoNameText: {fileID: 1869546948}
   infoTeamText: {fileID: 525111627}
   infoLevelText: {fileID: 874060796}
   infoSpriteImage: {fileID: 1781197936}
-  highlightColor: {r: 1, g: 0.97136354, b: 0.495283, a: 1}
-  whiteSacredRoadColor: {r: 0.9527337, g: 0.5896226, b: 1, a: 1}
-  blackSacredRoadColor: {r: 0.41960788, g: 1, b: 0.9836229, a: 1}
-  highlightTilemap: {fileID: 0}
-  whiteSacredRoadTilemap: {fileID: 0}
-  blackSacredRoadTilemap: {fileID: 0}
+  ultimateButton: {fileID: 506307330}
+  controllerRoot: {fileID: 1191064294}
 --- !u!4 &1215510239
 Transform:
   m_ObjectHideFlags: 0
@@ -1958,7 +1993,6 @@ GameObject:
   - component: {fileID: 1647749364}
   - component: {fileID: 1647749363}
   - component: {fileID: 1647749366}
-  - component: {fileID: 1647749365}
   m_Layer: 0
   m_Name: Grid
   m_TagString: Untagged
@@ -1994,30 +2028,6 @@ Transform:
   - {fileID: 1178001789}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1647749365
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1647749362}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 00eaf6bc31c74c4418e0c23360c0c992, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  tileSize: 1
-  boardTilemap: {fileID: 1178001791}
-  ultimateButton: {fileID: 506307330}
-  rollText: {fileID: 1905132258}
-  infoPanel: {fileID: 907421529}
-  infoName: {fileID: 1869546948}
-  infoTeam: {fileID: 525111627}
-  infoLevel: {fileID: 874060796}
-  infoSprite: {fileID: 1781197936}
-  highlightMap: {fileID: 0}
-  whiteRoadMap: {fileID: 0}
-  blackRoadMap: {fileID: 0}
 --- !u!1839735485 &1647749366
 Tilemap:
   m_ObjectHideFlags: 0
@@ -2443,50 +2453,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1905132256}
   m_CullTransparentMesh: 1
---- !u!1 &1917280677
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1917280679}
-  - component: {fileID: 1917280678}
-  m_Layer: 0
-  m_Name: BoardInput
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1917280678
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1917280677}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 18d24191c98f0734eb92c1d987aa99e5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!4 &1917280679
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1917280677}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1971701006
 GameObject:
   m_ObjectHideFlags: 0
@@ -2607,5 +2573,5 @@ SceneRoots:
   - {fileID: 1971701010}
   - {fileID: 394760000}
   - {fileID: 97047587}
-  - {fileID: 1917280679}
   - {fileID: 1459363816}
+  - {fileID: 1191064295}

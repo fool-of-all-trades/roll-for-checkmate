@@ -3,8 +3,6 @@ using UnityEngine;
 using Pieces;
 using System.Linq;
 using System;
-using System.Reflection;
-using System.Text.RegularExpressions;
 
 namespace Controller
 {
@@ -19,116 +17,7 @@ namespace Controller
         public void Initialize(IEnumerable<Piece> allPieces) =>
             pieces = new List<Piece>(allPieces);
 
-        private bool IsCastleAttempt(Piece piece, int toRow, int toCol)
-        {
-            return piece is King k
-                && !k.HasMoved
-                && toRow == k.Row
-                && Mathf.Abs(toCol - k.Col) == 2;
-        }
-
-        private bool SquaresAreSafeForKing(King king, int fromCol, int toCol)
-        {
-            int dir = Math.Sign(toCol - fromCol);
-            for (int c = fromCol; c != toCol + dir; c += dir)
-            {
-                // The king hypothetically stands on this square
-                if (CheckCheck(king, king.Row, c))    // uses checker.PredictDanger(...) internally
-                    return false;
-            }
-            return true;
-        }
-
-        private Rook FindCastlingRook(King king, int toCol)
-        {
-            int dir = Math.Sign(toCol - king.Col);
-            // rook should be at edge (0 or 7) in that direction
-            int rookCol = dir < 0 ? 0 : 7;
-            return PieceAt(king.Row, rookCol) as Rook;
-        }
-        private bool PathClearExceptEndpoints(int row, int fromCol, int toCol)
-        {
-            int dir = Math.Sign(toCol - fromCol);
-            for (int c = fromCol + dir; c != toCol; c += dir)
-            {
-                if (PieceAt(row, c) != null) return false;
-            }
-            return true;
-        }
-
-        public bool TryMove(Piece piece, int toRow, int toCol)
-        {
-            if (piece == null) return false;
-            if (piece.Team != whiteTurn) return false;
-
-            int fromRow = piece.Row;
-            int fromCol = piece.Col;
-
-            // 1. Shape/geometry check (piece.IsValidMove just shape & path, no danger)
-            if (!piece.IsValidMove(toRow, toCol))
-                return false;
-
-            // 2. Special case: castling checks
-            bool isCastle = IsCastleAttempt(piece, toRow, toCol);
-
-            if (isCastle)
-            {
-                var king = (King)piece;
-                // Are path squares safe?
-                if (!SquaresAreSafeForKing(king, fromCol, toCol))
-                    return false;
-
-                // Is there a rook & has it not moved?
-                var rook = FindCastlingRook(king, toCol);
-                if (rook == null || rook.HasMoved)
-                    return false;
-
-                // Also ensure squares between king & rook are empty
-                if (!PathClearExceptEndpoints(king.Row, fromCol, rook.Col))
-                    return false;
-            }
-
-            // 3. Simulate the move to see if your king will be in check (non-castle, general case)
-            // (Castling safety for squares is done above; but still ensure after castling final square is safe.)
-            if (!isCastle && CheckCheck(piece, toRow, toCol))
-                return false;
-
-            // 4. Commit: handle capture if any
-            Piece captured = PieceAt(toRow, toCol);
-            if (captured != null && captured.Team == piece.Team)
-                return false;
-
-            if (captured != null) CapturePiece(captured, piece);
-
-            // Move the piece (no visuals here)
-            piece.SetBoardCoords(toRow, toCol);
-
-            // 5. If castling, move the rook too (and consider firing a second MoveResult or extend the struct)
-            if (isCastle)
-            {
-                var king = (King)piece;
-                var rook = FindCastlingRook(king, toCol);
-                int dir = Math.Sign(toCol - fromCol);
-
-                int rookFromCol = rook.Col;
-                int rookToCol = toCol - dir;  // rook ends up next to king
-                rook.SetBoardCoords(king.Row, rookToCol);
-
-                // Option A: fire two events (king move, rook move)
-                OnMoveAccepted?.Invoke(new MoveResult(piece, fromRow, fromCol, toRow, toCol, captured));
-                OnMoveAccepted?.Invoke(new MoveResult(rook, king.Row, rookFromCol, king.Row, rookToCol));
-            }
-            else
-            {
-                // Normal move, single event
-                OnMoveAccepted?.Invoke(new MoveResult(piece, fromRow, fromCol, toRow, toCol, captured));
-            }
-
-            ToggleTurn();
-            return true;
-        }
-
-
+       
         public Piece PieceAt(int row, int col) =>
             pieces.FirstOrDefault(p => p.Row == row && p.Col == col);
 
@@ -151,7 +40,7 @@ namespace Controller
 
         public bool IsGameOver(Piece lastMovedPiece)
         {
-            bool teamToMove = whiteTurn;
+            bool teamToMove = turnMgr.WhiteTurn;
             Piece king = GetKing(teamToMove);
 
             foreach (var p in pieces.Where(x => x.Team == teamToMove))
@@ -168,41 +57,99 @@ namespace Controller
 
         /* ───────────── internal state & helpers ───────────── */
 
-        [SerializeField] private bool whiteStarts = true;
-
-        public bool IsWhiteTurn => whiteTurn;
-
-        bool whiteTurn;
-        readonly List<Piece> whiteCaptured = new();
-        readonly List<Piece> blackCaptured = new();
         List<Piece> pieces;                 // set in Initialize()
         Checker checker;                    // same class you had before
 
+        MoveValidator validator;
+        TurnManager turnMgr;
+        CaptureManager captureManager = new();
+
+
         void Awake()
         {
-            whiteTurn = whiteStarts; 
             checker = new Checker(PieceAt);
+            turnMgr = new TurnManager();
+            validator = new MoveValidator(turnMgr, PieceAt, checker, GetKing, this);
         }
 
-        public void ToggleTurn() => whiteTurn = !whiteTurn;
-
-        void TrackCapture(Piece captured, Piece winner)
+        public bool TryMove(Piece piece, int toRow, int toCol)
         {
-            if (captured.Team) whiteCaptured.Add(captured);
-            else blackCaptured.Add(captured);
+            if (!validator.IsLegalMove(piece, toRow, toCol, out var info))
+                return false;
 
-            // level-up logic (same as before)
-            if (winner.Level < 5)
-                winner.UpdateLevel(captured is Pawn ? 1 : 2);
+            int fromRow = piece.Row;
+            int fromCol = piece.Col;
+
+            // ----- captures (normal target square) -----
+            Piece captured = PieceAt(toRow, toCol);
+            if (captured != null)
+                captureManager.CapturePiece(pieces, captured, piece);
+
+            // ----- en‑passant capture BEFORE commit -----
+            if (piece is Pawn pawn && captured == null)
+            {
+                var eps = turnMgr.EnPassantSquare;
+                if (eps.HasValue && eps.Value.row == toRow && eps.Value.col == toCol)
+                {
+                    int dir = pawn.Team ? 1 : -1;
+                    Piece victim = PieceAt(toRow - dir, toCol);
+                    if (victim is Pawn && victim.Team != pawn.Team)
+                    {
+                        captureManager.CapturePiece(pieces, victim, pawn);
+                        captured = victim;           // include in MoveResult
+                    }
+                }
+            }
+
+            // ----- commit move -----
+            piece.SetBoardCoords(toRow, toCol);
+            piece.MarkMoved(); // needed for castling cuz those towers do be cheating
+
+            // set new en‑passant square if pawn double‑stepped
+            if (piece is Pawn p && Math.Abs(toRow - fromRow) == 2)
+            {
+                int midRow = (fromRow + toRow) / 2;
+                turnMgr.SetEnPassant(midRow, fromCol, p);
+            }
+
+            // ----- castling rook move + events -----
+            if (info.IsCastle)
+            {
+                var rook = info.CastleRook;
+                int dir = Math.Sign(toCol - fromCol);
+                int rookToCol = toCol - dir;
+                int rookFromCol = rook.Col;
+
+                rook.SetBoardCoords(piece.Row, rookToCol);
+                rook.MarkMoved();
+
+                OnMoveAccepted?.Invoke(new MoveResult(piece, fromRow, fromCol, toRow, toCol, captured));
+                OnMoveAccepted?.Invoke(new MoveResult(rook, piece.Row, rookFromCol, piece.Row, rookToCol));
+            }
+            else
+            {
+                OnMoveAccepted?.Invoke(new MoveResult(piece, fromRow, fromCol, toRow, toCol, captured));
+            }
+
+            // TODO: promotion UI / replacement here
+
+            turnMgr.ToggleTurn();          // flip side & clear old en‑passant square
+            return true;
         }
 
-        public void CapturePiece(Piece captured, Piece winner)   // NEW
+
+        // REMOVE LATER CUZ THIS IS NOT A GOOD WAY OF DOING THIS, JUST FOR TESTS
+        // expose current side
+        public bool IsWhiteTurn => turnMgr.WhiteTurn;
+
+        // let view flip turn manually (HandleCaptureOrDuel uses it)
+        public void ToggleTurn() => turnMgr.ToggleTurn();
+
+        // capture wrapper
+        public void CapturePiece(Piece captured, Piece winner)
         {
-            if (captured == null) return;
-
-            pieces.Remove(captured);
-            captured.gameObject.SetActive(false);   // visual tidy-up
-            TrackCapture(captured, winner);         // XP / level logic
+            captureManager.CapturePiece(pieces, captured, winner);
         }
+
     }
 }

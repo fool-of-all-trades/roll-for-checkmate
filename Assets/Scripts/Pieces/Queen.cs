@@ -18,9 +18,8 @@ namespace Pieces
         /// </summary>
         public override bool IsValidMove(int newRow, int newCol)
         {
-            // Check board boundaries
-            if (!board.IsValidPosition(newRow, newCol))
-                return false;
+            // Out of the board?
+            if (newRow < 0 || newRow > 7 || newCol < 0 || newCol > 7) return false;
 
             // Cannot move to the same square
             if (newRow == Row && newCol == Col)
@@ -29,50 +28,11 @@ namespace Pieces
             int rowDiff = Math.Abs(newRow - Row);
             int colDiff = Math.Abs(newCol - Col);
 
-            // Diagonal movement
-            if (rowDiff == colDiff)
-            {
-                int rowStep = Math.Sign(newRow - Row);
-                int colStep = Math.Sign(newCol - Col);
-                int currentRow = Row + rowStep;
-                int currentCol = Col + colStep;
+            bool diagonal = rowDiff == colDiff;
+            bool straight = (newRow == Row) || (newCol == Col);
 
-                // Ensure no pieces block the path
-                while (currentRow != newRow && currentCol != newCol)
-                {
-                    if (board.GetPieceAt(currentRow, currentCol) != null)
-                        return false;
-                    currentRow += rowStep;
-                    currentCol += colStep;
-                }
-
-                Piece target = board.GetPieceAt(newRow, newCol);
-                return target == null || target.Team != Team;
-            }
-
-            // Vertical or horizontal movement
-            if (newRow == Row || newCol == Col)
-            {
-                int rowStep = Math.Sign(newRow - Row);
-                int colStep = Math.Sign(newCol - Col);
-                int currentRow = Row + rowStep;
-                int currentCol = Col + colStep;
-
-                // Ensure no pieces block the path
-                while (currentRow != newRow || currentCol != newCol)
-                {
-                    if (board.GetPieceAt(currentRow, currentCol) != null)
-                        return false;
-                    currentRow += rowStep;
-                    currentCol += colStep;
-                }
-
-                Piece target = board.GetPieceAt(newRow, newCol);
-                return target == null || target.Team != Team;
-            }
-
-            // Move is neither diagonal nor straight
-            return false;
+            // Queen can move diagonally or straight
+            return diagonal || straight;
         }
     }
 }

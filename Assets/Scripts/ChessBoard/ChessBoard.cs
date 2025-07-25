@@ -35,10 +35,8 @@ public class ChessBoard : MonoBehaviour
     public Image infoSpriteImage;
     public Button ultimateButton;
 
-    private Vector2Int enPassantTile = new Vector2Int(-1, -1);
     private Piece selectedPiece;
     private Piece infoPiece;
-    private int roll;
 
     [Header("References")]
     [SerializeField] private MonoBehaviour controllerRoot;   // drag GameControllerMono here at edit-time
@@ -95,7 +93,6 @@ public class ChessBoard : MonoBehaviour
         return null;
     }
 
-    public Vector2Int EnPassantTile => enPassantTile;
 
     public Vector3 GridToWorld(int row, int col)
     {
@@ -161,18 +158,6 @@ public class ChessBoard : MonoBehaviour
         pieces.Add(piece);
     }
 
-    private void HandleClick(int row, int col)
-    {
-        var clickedPiece = GetPieceAt(row, col);
-
-        if (selectedPiece == null)
-            SelectPiece(row, col);
-        else if (clickedPiece != null && clickedPiece.Team == selectedPiece.Team)
-            SelectPiece(row, col);
-        else
-            AttemptMove(selectedPiece, row, col, clickedPiece);
-    }
-
     // Called automatically whenever GameControllerMono accepts a legal move
     private void ApplyMoveVisuals(MoveResult m)
     {
@@ -183,120 +168,41 @@ public class ChessBoard : MonoBehaviour
         if (m.Captured != null) HideCapturedPiece(m.Captured);
 
         // optional: clear last roll and refresh UI
-        roll = 0;
+        //roll = 0;
         UpdateUI();
     }
-
 
     private void SelectPiece(int row, int col)
     {
         var p = GetPieceAt(row, col);
+        // You may keep the side-to-move filter, or let controller reject out‑of‑turn clicks.
         if (p != null && p.Team == controller.IsWhiteTurn)
-        {
             selectedPiece = p;
-            infoPiece = p;
-        }
-        else
-            infoPiece = p;
+
+        infoPiece = p;        // Still update the info panel
     }
 
-    private void AttemptMove(Piece piece, int destRow, int destCol, Piece destPiece)
+    private void AttemptMove(int destRow, int destCol)
     {
-        if (!piece.IsValidMove(destRow, destCol) || controller.CheckCheck(piece, destRow, destCol))
-        {
-            selectedPiece = null;
-            infoPiece = destPiece;
-            return;
-        }
+        if (selectedPiece == null) return;
 
-        // Handle captures and duels
-        if (destPiece != null && destPiece.Team != piece.Team)
-        {
-            if (HandleCaptureOrDuel(piece, destPiece))
-            {
-                selectedPiece = null;
-                return;
-            }
-        }
-
-        // En Passant for Pawn
-        if (piece is Pawn)
-        {
-            int direction = piece.Team ? 1 : -1;
-            if (Mathf.Abs(piece.Row - destRow) == 2)
-                enPassantTile = new Vector2Int(destRow - direction, destCol);
-            else if (destRow == enPassantTile.x && destCol == enPassantTile.y)
-            {
-                var captured = GetPieceAt(destRow - direction, destCol);
-                if (captured != null && HandleCaptureOrDuel(piece, captured))
-                {
-                    selectedPiece = null;
-                    return;
-                }
-                enPassantTile = new Vector2Int(-1, -1);
-            }
-            else
-                enPassantTile = new Vector2Int(-1, -1);
-        }
-        else
-            enPassantTile = new Vector2Int(-1, -1);
-
-        // Castling for King
-        if (piece is King && Mathf.Abs(destCol - piece.Col) == 2)
-        {
-            int dir = (destCol - piece.Col) > 0 ? 1 : -1;
-            int rookOrigCol = dir > 0 ? 7 : 0;
-            var rook = GetPieceAt(piece.Row, rookOrigCol) as Rook;
-            if (rook != null)
-            {
-                MovePiece(rook, piece.Row, piece.Col + dir);
-                rook.MarkMoved();
-            }
-        }
-
-        // Finalize move
-        piece.MarkMoved();
-        MovePiece(piece, destRow, destCol);
-
-        controller.ToggleTurn();
-        if (controller.IsGameOver(piece))
-        {
-            Debug.Log("Game over");
-        }
+        // Let the controller decide legality, capture, duels, en‑passant, castling, promotion.
+        controller.TryMove(selectedPiece, destRow, destCol);
 
         selectedPiece = null;
         infoPiece = null;
     }
 
-    private bool HandleCaptureOrDuel(Piece attacker, Piece defender)
+    private void HandleClick(int row, int col)
     {
-        Debug.Log($"[Capture] {attacker.Name} {attacker.Team} (lvl {attacker.Level}) -> {defender.Name} (lvl {defender.Level})");
+        var clickedPiece = GetPieceAt(row, col);
 
-        // if defender ≤ attacker → auto-capture
-        if (defender.Level <= attacker.Level)
-        {
-            Debug.Log("[Capture] Defender level ≤ attacker → auto-capture");
-            controller.CapturePiece(defender, attacker);
-            return false;
-        }
-
-        // defender > attacker → duel
-        roll = Dice.Roll(10);
-        Debug.Log($"[Capture] Duel roll = {roll}");
-
-        if (controller.Duel(roll, attacker, defender))
-        {
-            Debug.Log("[Capture] Attacker won the duel");
-            controller.CapturePiece(defender, attacker);
-            return false;
-        }
+        if (selectedPiece == null)
+            SelectPiece(row, col);
+        else if (clickedPiece != null && clickedPiece.Team == selectedPiece.Team)
+            SelectPiece(row, col);
         else
-        {
-            Debug.Log("[Capture] Attacker lost the duel");
-            controller.CapturePiece(attacker, defender);
-            controller.ToggleTurn();
-            return true;
-        }
+            AttemptMove(row, col);   // ← pass only coordinates now
     }
 
     private void MovePiece(Piece p, int row, int col)
@@ -321,7 +227,7 @@ public class ChessBoard : MonoBehaviour
 
     private void UpdateUI()
     {
-        rollText.text = "Roll: " + roll.ToString();
+        //rollText.text = "Roll: " + roll.ToString();
         if (infoPiece != null)
         {
             infoPanel.SetActive(true);

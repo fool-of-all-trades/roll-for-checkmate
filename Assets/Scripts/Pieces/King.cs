@@ -21,6 +21,9 @@ namespace Pieces
         /// </summary>
         public override bool IsValidMove(int newRow, int newCol)
         {
+            // Out of the board?
+            if (newRow < 0 || newRow > 7 || newCol < 0 || newCol > 7) return false;
+
             // 1-step any direction
             if (Mathf.Abs(newRow - Row) <= 1 && Mathf.Abs(newCol - Col) <= 1)
                 return true;

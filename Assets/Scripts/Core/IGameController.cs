@@ -37,11 +37,12 @@ public interface IGameController
 
     public bool IsGameOver(Piece lastMovedPiece);
 
-    void ToggleTurn();
-
     public bool Duel(int rollResult, Piece attacker, Piece defender);
 
-    bool IsWhiteTurn { get; }
 
+    // REMOVE LATER
+    bool IsWhiteTurn { get; }              
+    void ToggleTurn();                       
     void CapturePiece(Piece captured, Piece winner);
+
 }

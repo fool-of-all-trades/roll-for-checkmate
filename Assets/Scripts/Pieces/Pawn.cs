@@ -18,45 +18,20 @@ namespace Pieces
         public override bool IsValidMove(int newRow, int newCol)
         {
             // Out of the board?
-            if (!board.IsValidPosition(newRow, newCol))
-                return false;
+            if (newRow < 0 || newRow > 7 || newCol < 0 || newCol > 7) return false;
 
             int direction = Team ? 1 : -1;
             int rowDiff = newRow - Row;
             int colDiff = newCol - Col;
 
-            // Move forward
-            if (colDiff == 0)
-            {
-                // 1 hop
-                if (rowDiff == direction && board.GetPieceAt(newRow, newCol) == null)
-                    return true;
+            // Forward moves (1 or 2 depending on start row) -> just geometry
+            bool atStart = (Team && Row == 1) || (!Team && Row == 6);
+            if (colDiff == 0 && (rowDiff == direction || (atStart && rowDiff == 2 * direction)))
+                return true;
 
-                // 2 hops
-                bool atStart = (Team && Row == 1) || (!Team && Row == 6);
-                if (atStart && rowDiff == 2 * direction)
-                {
-                    int midRow = Row + direction;
-                    if (board.GetPieceAt(midRow, Col) == null &&
-                        board.GetPieceAt(newRow, newCol) == null)
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            // Diagonal capture
+            // Diagonal capture/en-passant shape: 1 row forward, 1 col sideways
             if (Math.Abs(colDiff) == 1 && rowDiff == direction)
-            {
-                Piece target = board.GetPieceAt(newRow, newCol);
-                if (target != null && target.Team != Team)
-                    return true;
-
-                // En Passant
-                Vector2Int ep = board.EnPassantTile;
-                if (ep.x == newRow && ep.y == newCol)
-                    return true;
-            }
+                return true;
 
             return false;
         }
