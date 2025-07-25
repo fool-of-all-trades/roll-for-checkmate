@@ -86,7 +86,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  Usunąć sprawdzanie zasad z ChessBoard, od tego jest GameController
 
 2.2 Rozbić duże pliki:
-🔲  ChessBoard
+✅  ChessBoard
 ✅  GameController
 
 2.3  Implementacja multiplayera

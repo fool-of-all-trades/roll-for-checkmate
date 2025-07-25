@@ -39,8 +39,6 @@ public interface IGameController
 
     public bool IsGameOver(Piece lastMovedPiece);
 
-    public bool Duel(int rollResult, Piece attacker, Piece defender);
-
 
     // REMOVE LATER
     bool IsWhiteTurn { get; }

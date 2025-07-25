@@ -24,12 +24,6 @@ namespace Controller
 
         /* ───────────── public helpers (unchanged from old GC) ───────────── */
 
-        public bool Duel(int rollResult, Piece attacker, Piece defender)
-        {
-            int threshold = 5 + defender.Level - attacker.Level;
-            return rollResult > threshold;
-        }
-
         public Piece GetKing(bool team) =>
             pieces.FirstOrDefault(p => p is King && p.Team == team);
 
@@ -184,7 +178,7 @@ namespace Controller
             => captureManager.CapturePiece(pieces, captured, winner);
 
 
-
+        // for the King's ultimate
         public bool TryRelocate(Piece piece, int toRow, int toCol)
         {
             if (PieceAt(toRow, toCol) != null) return false;
