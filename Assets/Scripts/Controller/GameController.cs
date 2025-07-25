@@ -12,6 +12,7 @@ namespace Controller
         /* ───────────── IGameController contract ───────────── */
 
         public event Action<MoveResult> OnMoveAccepted;
+        public event Action<int> OnDuelRolled;
 
         /// <summary>Called once by ChessBoard in Awake to give us the live piece list.</summary>
         public void Initialize(IEnumerable<Piece> allPieces) =>
@@ -64,12 +65,18 @@ namespace Controller
         TurnManager turnMgr;
         CaptureManager captureManager = new();
 
+        [SerializeField] private MonoBehaviour duelServiceRoot;  // drag in Inspector
+        IDuelService duels;
+
+
 
         void Awake()
         {
             checker = new Checker(PieceAt);
             turnMgr = new TurnManager();
             validator = new MoveValidator(turnMgr, PieceAt, checker, GetKing, this);
+
+            duels = (IDuelService)duelServiceRoot;
         }
 
         public bool TryMove(Piece piece, int toRow, int toCol)
@@ -82,8 +89,29 @@ namespace Controller
 
             // ----- captures (normal target square) -----
             Piece captured = PieceAt(toRow, toCol);
-            if (captured != null)
-                captureManager.CapturePiece(pieces, captured, piece);
+            if (captured != null &&
+                    captured.Team != piece.Team &&      // enemy
+                    captured.Level > piece.Level)       // duel required
+            {
+                if (!duels.ResolveDuel(piece, captured, out int roll))
+                {
+                    // attacker lost
+                    captureManager.CapturePiece(pieces, piece, captured);
+                    OnDuelRolled?.Invoke(roll);
+                    turnMgr.ToggleTurn();
+                    return true;    // move ends here (attacker removed)
+                }
+                else
+                {
+                    // attacker won
+                    captureManager.CapturePiece(pieces, captured, piece);
+                    OnDuelRolled?.Invoke(roll);
+                    // continue to commit attacker’s move below
+                }
+            }
+
+
+
 
             // ----- en‑passant capture BEFORE commit -----
             if (piece is Pawn pawn && captured == null)
@@ -141,15 +169,6 @@ namespace Controller
         // REMOVE LATER CUZ THIS IS NOT A GOOD WAY OF DOING THIS, JUST FOR TESTS
         // expose current side
         public bool IsWhiteTurn => turnMgr.WhiteTurn;
-
-        // let view flip turn manually (HandleCaptureOrDuel uses it)
-        public void ToggleTurn() => turnMgr.ToggleTurn();
-
-        // capture wrapper
-        public void CapturePiece(Piece captured, Piece winner)
-        {
-            captureManager.CapturePiece(pieces, captured, winner);
-        }
 
     }
 }

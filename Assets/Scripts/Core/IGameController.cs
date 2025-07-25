@@ -15,6 +15,8 @@ public interface IGameController
     /// </summary>
     event Action<MoveResult> OnMoveAccepted;
 
+    event Action<int> OnDuelRolled;
+
     /// <summary>
     /// Attempts to move <paramref name="piece"/> to the target
     /// square.  Returns true if the move is legal and applied;
@@ -42,7 +44,5 @@ public interface IGameController
 
     // REMOVE LATER
     bool IsWhiteTurn { get; }              
-    void ToggleTurn();                       
-    void CapturePiece(Piece captured, Piece winner);
 
 }

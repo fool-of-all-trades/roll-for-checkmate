@@ -45,7 +45,9 @@ public class ChessBoard : MonoBehaviour
     private void Awake()
     {
         controller = (IGameController)controllerRoot; 
+
         controller.OnMoveAccepted += ApplyMoveVisuals;
+        controller.OnDuelRolled += ShowRoll;
     }
 
     private void Start()
@@ -59,7 +61,10 @@ public class ChessBoard : MonoBehaviour
     private void OnDestroy()
     {
         if (controller != null)
+        {
             controller.OnMoveAccepted -= ApplyMoveVisuals;
+            controller.OnDuelRolled -= ShowRoll;
+        }
     }
 
 
@@ -227,7 +232,6 @@ public class ChessBoard : MonoBehaviour
 
     private void UpdateUI()
     {
-        //rollText.text = "Roll: " + roll.ToString();
         if (infoPiece != null)
         {
             infoPanel.SetActive(true);
@@ -241,4 +245,10 @@ public class ChessBoard : MonoBehaviour
 
         ultimateButton.gameObject.SetActive(selectedPiece != null && selectedPiece.CanUseUltimate());
     }
+
+    private void ShowRoll(int value)
+    {
+        rollText.text = $"Rolled: {value}";
+    }
+
 }
