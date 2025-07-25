@@ -85,11 +85,6 @@ public class ChessBoard : MonoBehaviour
         }
     }
 
-    public bool IsValidPosition(int row, int col)
-    {
-        return row >= 0 && row < 8 && col >= 0 && col < 8;
-    }
-
     public Piece GetPieceAt(int row, int col)
     {
         foreach (var p in pieces)

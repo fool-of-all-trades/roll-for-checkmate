@@ -29,7 +29,6 @@ namespace Pieces
 
         private void Awake()
         {
-            board = FindObjectOfType<ChessBoard>();
             spriteRenderer = GetComponent<SpriteRenderer>();
         }
 
@@ -56,13 +55,11 @@ namespace Pieces
         {
             row = r;
             col = c;
-            // or Row = r; Col = c;  (both work because you're inside the same class)
         }
 
 
         public void Init(ChessBoard boardCtx, int startRow, int startCol, bool team)
         {
-            // store the board context so all IsValidMove calls still work
             this.board = boardCtx;
 
             // set the grid coords + move the transform
