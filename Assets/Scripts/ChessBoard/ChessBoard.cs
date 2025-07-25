@@ -238,6 +238,7 @@ public class ChessBoard : MonoBehaviour
 
     void ShowRoads(IReadOnlyList<Vector2Int> white, IReadOnlyList<Vector2Int> black)
     {
+        
         // paint tiles, show highlights for sacred road
     }
 

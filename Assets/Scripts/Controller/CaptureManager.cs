@@ -1,10 +1,13 @@
 using Pieces;
 using System.Collections.Generic;
 
-class CaptureManager
+public class CaptureManager
 {
     readonly List<Piece> whiteCaptured = new();
     readonly List<Piece> blackCaptured = new();
+
+    public List<Piece> GetCapturedList(bool team)
+    => team ? whiteCaptured : blackCaptured;
 
     public void CapturePiece(List<Piece> pieces, Piece captured, Piece winner)
     {

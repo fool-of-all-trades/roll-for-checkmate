@@ -51,4 +51,9 @@ public interface IGameController
     /// Relocates a piece without checking legality (used by ultimates).
     /// Returns false if the destination square is occupied.
     bool TryRelocate(Piece piece, int toRow, int toCol);
+
+    public bool ResurrectPawn(bool team);
+    public bool ResurrectPiece(bool team);
+    public Vector2Int? GetResurrectionSquare(bool team);
+
 }

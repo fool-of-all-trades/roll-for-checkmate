@@ -76,6 +76,9 @@ namespace Controller
         [SerializeField] MonoBehaviour sacredRoadRoot;
         ISacredRoadService sacredRoad;
 
+        [SerializeField] private MonoBehaviour resurrectionRoot;
+        IResurrectionService resurrector;
+
         void Awake()
         {
             checker = new Checker(PieceAt);
@@ -86,7 +89,11 @@ namespace Controller
             duels.Init(PieceAt, GetKing, queensCurse);
             queensCurse = (ICurseService)curseServiceRoot;
             sacredRoad = (ISacredRoadService)sacredRoadRoot;
+
+            resurrector = (ResurrectionService)resurrectionRoot;
+            resurrector.Init(PieceAt, AddPieceToBoard, captureManager);
         }
+
 
         public bool TryMove(Piece piece, int toRow, int toCol)
         {
@@ -231,6 +238,23 @@ namespace Controller
 
             return list;
         }
+
+        private void AddPieceToBoard(Piece p, int row, int col)
+        {
+            // Add to our authoritative list
+            if (!pieces.Contains(p))
+                pieces.Add(p);
+
+            // Set board coords (no visuals)
+            p.SetBoardCoords(row, col);
+
+            // Let the board render it: fromRow/fromCol = -1 indicates "spawn"
+            OnMoveAccepted?.Invoke(new MoveResult(p, -1, -1, row, col));
+        }
+
+        public bool ResurrectPawn(bool team) => resurrector.ResurrectPawn(team);
+        public bool ResurrectPiece(bool team) => resurrector.ResurrectPiece(team);
+        public Vector2Int? GetResurrectionSquare(bool team) => resurrector.GetResurrectionSquare(team);
 
 
     }
