@@ -16,13 +16,14 @@ namespace Pieces
         }
 
         /// <summary>
-        /// Checks if the Knight's move is valid.
-        /// Knight moves in an L-shape: two squares in one direction and one square perpendicular.
+        /// Checks if the Knight's move is valid geometrically.
+        /// Doesn't check for safety, that's the controller's job.
         /// </summary>
         public override bool IsValidMove(int newRow, int newCol)
         {
             // Out of the board?
-            if (newRow < 0 || newRow > 7 || newCol < 0 || newCol > 7) return false;
+            if (newRow < 0 || newRow > 7 || newCol < 0 || newCol > 7) 
+                return false;
 
             int rowDiff = newRow - Row;
             int colDiff = newCol - Col;

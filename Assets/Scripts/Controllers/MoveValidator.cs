@@ -184,7 +184,6 @@ namespace Controller
             if (rook.HasMoved) return false;
 
             // Squares between king & rook empty
-            //                                       int fromRow, int fromCol, int toRow, int toCol
             if (!PathUtils.PathClearExceptEndpoints(pieceAt, king.Row, fc, rook.Col)) return false;
 
             // Squares the king crosses must be safe

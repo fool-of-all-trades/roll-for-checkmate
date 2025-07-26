@@ -1,9 +1,5 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using Controller;
 using Pieces;
-using static UnityEngine.Rendering.DebugUI.Table;
 
 namespace Abilities
 {
@@ -27,7 +23,6 @@ namespace Abilities
             ChessBoard board = owner.board;
             int kr = owner.Row;
             int kc = owner.Col;
-            bool pushed = false;
 
             // Directions to search for enemies
             int[][] dirs = new int[][]

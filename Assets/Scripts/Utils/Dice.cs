@@ -14,7 +14,6 @@ namespace Utils
         /// <returns>Random integer between 1 and sides, inclusive.</returns>
         public static int Roll(int sides)
         {
-            // <min, max)
             return Random.Range(1, sides + 1);
         }
     }

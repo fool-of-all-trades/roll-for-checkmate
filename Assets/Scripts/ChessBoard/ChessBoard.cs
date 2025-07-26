@@ -1,9 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
-using System;
 using System.Collections.Generic;
 using Pieces;
-using Utils;
 using TMPro;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
@@ -64,7 +62,9 @@ public class ChessBoard : MonoBehaviour
     {
         if (controller != null)
         {
+            // unsubscribe from controller events
             controller.OnMoveAccepted -= ApplyMoveVisuals;
+            controller.OnDuelRolled -= ShowRoll;
             controller.OnDuelRolled -= ShowRoll;
         }
     }
@@ -115,22 +115,27 @@ public class ChessBoard : MonoBehaviour
         SpawnPiece(rookPrefab, 0, 7, true);
         SpawnPiece(rookPrefab, 7, 0, false);
         SpawnPiece(rookPrefab, 7, 7, false);
+
         // Knights
         SpawnPiece(knightPrefab, 0, 1, true);
         SpawnPiece(knightPrefab, 0, 6, true);
         SpawnPiece(knightPrefab, 7, 1, false);
         SpawnPiece(knightPrefab, 7, 6, false);
+
         // Bishops
         SpawnPiece(bishopPrefab, 0, 2, true);
         SpawnPiece(bishopPrefab, 0, 5, true);
         SpawnPiece(bishopPrefab, 7, 2, false);
         SpawnPiece(bishopPrefab, 7, 5, false);
+
         // Queens
         SpawnPiece(queenPrefab, 0, 4, true);
         SpawnPiece(queenPrefab, 7, 4, false);
+
         // Kings
         SpawnPiece(kingPrefab, 0, 3, true);
         SpawnPiece(kingPrefab, 7, 3, false);
+
         // Pawns
         for (int c = 0; c < 8; c++)
         {
@@ -238,7 +243,6 @@ public class ChessBoard : MonoBehaviour
 
     void ShowRoads(IReadOnlyList<Vector2Int> white, IReadOnlyList<Vector2Int> black)
     {
-        
         // paint tiles, show highlights for sacred road
     }
 

@@ -1,6 +1,3 @@
-// Assets/Scripts/Abilities/RookUltimateAbility.cs
-using System;
-using Controller;
 using Pieces;
 using UnityEngine;
 
@@ -62,12 +59,15 @@ namespace Abilities
                     }
                 }
 
+                // so for now the first found is the one that gets shot
+                // but we could also add that all possible targets gets hilighted
+                // and the player can choose which one to shoot
                 if (target != null) break;   // found a victim -> stop other dirs
             }
 
             if (target != null)
             {
-                controller.CapturePiece(target, owner);   // XP + hide prefab
+                controller.CapturePiece(target, owner);   // XP for the rook + hide prefab of the victim
                 Debug.Log($"Rook sniped {target.Name} at ({target.Row},{target.Col})");
                 usedUltimate = true;
             }

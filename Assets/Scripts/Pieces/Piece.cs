@@ -1,8 +1,5 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using Abilities;
-using Controller;
 
 namespace Pieces
 {
@@ -50,13 +47,11 @@ namespace Pieces
             transform.position = board.GridToWorld(newRow, newCol);
         }
 
-        // Inside your Piece class
         public void SetBoardCoords(int r, int c)
         {
             row = r;
             col = c;
         }
-
 
         public void Init(ChessBoard boardCtx, int startRow, int startCol, bool team)
         {

@@ -1,6 +1,6 @@
 ﻿// Immutable “data packet” that GameControllerMono raises
-// and ChessBoard listens to.  No methods mutate state; all
-// board updates have already happened before the event fires.
+// and ChessBoard listens to. No methods mutate state:
+// all board updates have already happened before the event fires.
 using Pieces;
 
 /// <summary>
