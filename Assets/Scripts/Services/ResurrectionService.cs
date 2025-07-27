@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Pieces;
@@ -21,6 +21,13 @@ public class ResurrectionService : MonoBehaviour, IResurrectionService
         this.captureMgr = captureMgr;
     }
 
+    /// <summary>
+    /// Finds an empty board square in range for a team’s resurrected piece.
+    /// The square is chosen based on proximity to it's part of the board.
+    /// </summary>
+    /// <returns>
+    /// The chosen (row, col) or null if no empty square is available.
+    /// </returns>
     public Vector2Int? GetResurrectionSquare(bool team)
     {
         int backRank = team ? 0 : 7;
@@ -53,6 +60,10 @@ public class ResurrectionService : MonoBehaviour, IResurrectionService
         return candidates[0];
     }
 
+    /// <summary>
+    /// Attempts to bring a captured pawn of the given team back into play using RevivePiece().
+    /// </summary>
+    /// <returns>True if a pawn was resurrected, false otherwise.</returns>
     public bool ResurrectPawn(bool team)
     {
         var sq = GetResurrectionSquare(team);
@@ -71,6 +82,10 @@ public class ResurrectionService : MonoBehaviour, IResurrectionService
         return false;
     }
 
+    /// <summary>
+    /// Attempts to resurrect a non‑pawn piece of the given team, falling back to a pawn if no dead non-pawn is found.
+    /// </summary>
+    /// <returns>True if any piece was resurrected; false otherwise.</returns>
     public bool ResurrectPiece(bool team)
     {
         var sq = GetResurrectionSquare(team);
@@ -91,12 +106,16 @@ public class ResurrectionService : MonoBehaviour, IResurrectionService
         return ResurrectPawn(team);
     }
 
+    /// <summary>
+    /// Configures and activates a captured Piece at the target square.
+    /// </summary>
     void RevivePiece(Piece piece, bool team, int r, int c)
     {
         piece.ChangeTeam(team);
         piece.gameObject.SetActive(true);
         
-        // We do NOT call SetGridPosition (that uses ChessBoard). Use controller�s addPieceToBoard.
+        // we do NOT call SetGridPosition (that is used in ChessBoard)
+        // here we use controller’s addPieceToBoard
         addPieceToBoard(piece, r, c);
         Debug.Log($"{piece.Name} resurrected at ({r},{c}) for {(team ? "White" : "Black")}");
     }
