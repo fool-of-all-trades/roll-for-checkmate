@@ -4,11 +4,13 @@ public interface IDuelService
 {
 
     public void Init(Func<int, int, Piece> pieceAt,
-                     Func<bool, Piece> getKing,
                      ICurseService curses = null);
     DuelResult ResolveDuel(Piece attacker, Piece defender);
 }
 
+/// <summary>
+/// Represents the result of a duel between two pieces.
+/// </summary>
 public readonly struct DuelResult
 {
     public readonly bool AttackerWon;

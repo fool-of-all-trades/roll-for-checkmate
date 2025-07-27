@@ -85,7 +85,7 @@ namespace Controller
             validator = new MoveValidator(turnMgr, PieceAt, checker, GetKing, this);
 
             duels = (IDuelService)duelServiceRoot;
-            duels.Init(PieceAt, GetKing, queensCurse);
+            duels.Init(PieceAt, queensCurse);
             queensCurse = (ICurseService)curseServiceRoot;
             sacredRoad = (ISacredRoadService)sacredRoadRoot;
 
