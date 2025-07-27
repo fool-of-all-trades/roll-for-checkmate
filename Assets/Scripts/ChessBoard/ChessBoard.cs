@@ -6,6 +6,9 @@ using TMPro;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
 
+/// <summary>
+/// Renders the board, spawns pieces, handles input, and updates UI.
+/// </summary>
 public class ChessBoard : MonoBehaviour
 {
     [Header("Grid Settings")]
@@ -40,6 +43,8 @@ public class ChessBoard : MonoBehaviour
     [SerializeField] private MonoBehaviour controllerRoot; 
     private IGameController controller;
 
+    #region Unity Lifecycle
+
     private void Awake()
     {
         // subscribe to controller events
@@ -65,11 +70,13 @@ public class ChessBoard : MonoBehaviour
             // unsubscribe from controller events
             controller.OnMoveAccepted -= ApplyMoveVisuals;
             controller.OnDuelRolled -= ShowRoll;
-            controller.OnDuelRolled -= ShowRoll;
+            controller.OnRoadsChanged -= ShowRoads;
         }
     }
 
-
+    /// <summary>
+    /// Detects clicks outside UI and routes to selection or move logic.
+    /// </summary>
     private void Update()
     {
         if (Input.GetMouseButtonDown(0))
@@ -86,28 +93,13 @@ public class ChessBoard : MonoBehaviour
             UpdateUI();
         }
     }
+    #endregion
 
-    public Piece GetPieceAt(int row, int col)
-    {
-        foreach (var p in pieces)
-            if (p.Row == row && p.Col == col)
-                return p;
-        return null;
-    }
+    #region Board Initialization
 
-
-    public Vector3 GridToWorld(int row, int col)
-    {
-        Vector3Int cellPos = new Vector3Int(col, row, 0);
-        return boardTilemap.GetCellCenterWorld(cellPos);
-    }
-
-    public void HideCapturedPiece(Piece piece)
-    {
-        pieces.Remove(piece);
-        piece.gameObject.SetActive(false);
-    }
-
+    /// <summary>
+    /// Places all pieces on their standard starting squares.
+    /// </summary>
     private void AddPieces()
     {
         // Rooks
@@ -144,50 +136,93 @@ public class ChessBoard : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Spawns a piece prefab at the given grid position and adds it to the pieces list.
+    /// </summary>
     private void SpawnPiece(GameObject prefab, int row, int col, bool team)
     {
         Vector3 worldPos = GridToWorld(row, col);
-        // make the tilemap your parent so the board’s transform/origin “carries along” the piece:
+
         var go = Instantiate(prefab, worldPos, Quaternion.identity, boardTilemap.transform);
 
         var piece = go.GetComponent<Piece>();
         piece.Init(this, row, col, team);
         pieces.Add(piece);
     }
+    #endregion
 
-    // Called automatically whenever GameControllerMono accepts a legal move
-    private void ApplyMoveVisuals(MoveResult m)
+    #region Helpers
+
+    /// <summary>
+    /// Returns the piece at the given square, or null if empty.
+    /// </summary>
+    public Piece GetPieceAt(int row, int col)
     {
-        // move the winner’s prefab
-        MovePiece(m.Piece, m.ToRow, m.ToCol);
-
-        // hide the loser if there was a capture
-        if (m.Captured != null) HideCapturedPiece(m.Captured);
-
-        UpdateUI();
+        foreach (var p in pieces)
+            if (p.Row == row && p.Col == col)
+                return p;
+        return null;
     }
 
+    /// <summary>
+    /// Converts board coordinates to world-space position.
+    /// </summary>
+    public Vector3 GridToWorld(int row, int col)
+    {
+        Vector3Int cellPos = new Vector3Int(col, row, 0);
+        return boardTilemap.GetCellCenterWorld(cellPos);
+    }
+
+    /// <summary>
+    /// Removes a captured piece from the active list and hides its GameObject.
+    /// </summary>
+    private void HideCapturedPiece(Piece piece)
+    {
+        pieces.Remove(piece);
+        piece.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Updates a piece’s visual and logic position to the new board coordinates.
+    /// </summary>
+    private void MovePiece(Piece p, int row, int col)
+    {
+        p.SetViewPosition(row, col);
+    }
+    #endregion
+
+    #region Input Handling
+
+    /// <summary>
+    /// Selects the piece at (row, col) if it belongs to the player whose turn it is.
+    /// </summary>
     private void SelectPiece(int row, int col)
     {
         var p = GetPieceAt(row, col);
-        // You may keep the side-to-move filter, or let controller reject out‑of‑turn clicks.
         if (p != null && p.Team == controller.IsWhiteTurn)
+
             selectedPiece = p;
 
-        infoPiece = p;        // Still update the info panel
+        infoPiece = p;
     }
 
+    /// <summary>
+    /// Attempts to move the currently selected piece to (destRow, destCol).
+    /// </summary>
     private void AttemptMove(int destRow, int destCol)
     {
         if (selectedPiece == null) return;
 
-        // Let the controller decide legality, capture, duels, en‑passant, castling, promotion.
+        // The controller decides legality, capture, duels, en‑passant, castling, promotion...
         controller.TryMove(selectedPiece, destRow, destCol);
 
         selectedPiece = null;
         infoPiece = null;
     }
 
+    /// <summary>
+    /// Handles a board click: either selects a piece or asks controller to make a move.
+    /// </summary>
     private void HandleClick(int row, int col)
     {
         var clickedPiece = GetPieceAt(row, col);
@@ -197,14 +232,11 @@ public class ChessBoard : MonoBehaviour
         else if (clickedPiece != null && clickedPiece.Team == selectedPiece.Team)
             SelectPiece(row, col);
         else
-            AttemptMove(row, col);   // ← pass only coordinates now
+            AttemptMove(row, col);
     }
+    #endregion
 
-    private void MovePiece(Piece p, int row, int col)
-    {
-        p.SetViewPosition(row, col);
-    }
-
+    #region UI
     private void OnUltimateButtonClicked()
     {
         Debug.Log("[UI] Ultimate button clicked!");
@@ -217,9 +249,11 @@ public class ChessBoard : MonoBehaviour
         {
             Debug.Log("[UI] selectedPiece is null");
         }
-
     }
 
+    /// <summary>
+    /// Updates the info panel and shows or hides the Ultimate button based on selection state.
+    /// </summary>
     private void UpdateUI()
     {
         if (infoPiece != null)
@@ -235,6 +269,20 @@ public class ChessBoard : MonoBehaviour
 
         ultimateButton.gameObject.SetActive(selectedPiece != null && selectedPiece.CanUseUltimate());
     }
+    #endregion
+
+    #region Event Methods
+    // Event methods are called automatically when the given event raises
+    private void ApplyMoveVisuals(MoveResult m)
+    {
+        // move the winner’s prefab
+        MovePiece(m.Piece, m.ToRow, m.ToCol);
+
+        // hide the loser if there was a capture
+        if (m.Captured != null) HideCapturedPiece(m.Captured);
+
+        UpdateUI();
+    }
 
     private void ShowRoll(int value)
     {
@@ -243,7 +291,7 @@ public class ChessBoard : MonoBehaviour
 
     void ShowRoads(IReadOnlyList<Vector2Int> white, IReadOnlyList<Vector2Int> black)
     {
-        // paint tiles, show highlights for sacred road
+        // paint tiles, show highlights for sacred road, sparkly stuff
     }
-
+    #endregion
 }

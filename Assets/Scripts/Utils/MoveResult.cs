@@ -17,8 +17,10 @@ public readonly struct MoveResult
 
     public MoveResult(
         Piece piece,
-        int fromRow, int fromCol,
-        int toRow, int toCol,
+        int fromRow, 
+        int fromCol,
+        int toRow, 
+        int toCol,
         Piece captured = null)
     {
         Piece = piece;
