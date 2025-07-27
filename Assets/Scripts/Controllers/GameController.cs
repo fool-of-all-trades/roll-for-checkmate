@@ -198,20 +198,6 @@ namespace Controller
             return true;
         }
 
-
-        // REMOVE LATER CUZ THIS IS NOT A GOOD WAY OF DOING THIS, JUST FOR TESTS
-        // expose current side
-        public bool IsWhiteTurn => turnMgr.WhiteTurn;
-
-        // GameControllerMono.cs
-        public void CapturePiece(Piece captured, Piece winner)
-        {
-            captureManager.CapturePiece(pieces, captured, winner);
-            if (captured is Queen)
-                queensCurse.ApplyCurse(winner, 6);  // 6 half-moves = 3 full turns
-        }
-
-
         // for the King's ultimate
         public bool TryRelocate(Piece piece, int toRow, int toCol)
         {
@@ -255,6 +241,18 @@ namespace Controller
         public bool ResurrectPiece(bool team) => resurrector.ResurrectPiece(team);
         public Vector2Int? GetResurrectionSquare(bool team) => resurrector.GetResurrectionSquare(team);
 
+
+        // REMOVE LATER CUZ THIS IS NOT A GOOD WAY OF DOING THIS, JUST FOR TESTS
+        // expose current side
+        public bool IsWhiteTurn => turnMgr.WhiteTurn;
+
+        // GameControllerMono.cs
+        public void CapturePiece(Piece captured, Piece winner)
+        {
+            captureManager.CapturePiece(pieces, captured, winner);
+            if (captured is Queen)
+                queensCurse.ApplyCurse(winner, 6);  // 6 half-moves = 3 full turns
+        }
 
     }
 }

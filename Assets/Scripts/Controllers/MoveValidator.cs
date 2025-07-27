@@ -1,6 +1,5 @@
 using System;
 using Pieces;
-using UnityEngine;
 
 namespace Controller
 {
@@ -31,7 +30,9 @@ namespace Controller
             this.controller = controller;
         }
 
-        // --------------  DTO returned to controller  --------------
+        /// <summary>
+        /// DTO returned to controller when a move is legal.
+        /// </summary>
         public readonly struct MoveAnalysis
         {
             public readonly bool IsCastle;
@@ -42,7 +43,9 @@ namespace Controller
             }
         }
 
-        // --------------  PUBLIC ENTRY POINT  --------------
+        /// <summary>
+        /// Checks if the move is legal (shape, castling, king safety) for the given piece.
+        /// </summary>
         public bool IsLegalMove(Piece piece, int toRow, int toCol,
                                 out MoveAnalysis analysis)
         {

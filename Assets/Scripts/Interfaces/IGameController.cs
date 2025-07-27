@@ -42,12 +42,6 @@ public interface IGameController
 
     public bool IsGameOver(Piece lastMovedPiece);
 
-
-    // REMOVE LATER
-    bool IsWhiteTurn { get; }
-    public void CapturePiece(Piece captured, Piece winner);
-
-
     /// Relocates a piece without checking legality (used by ultimates).
     /// Returns false if the destination square is occupied.
     bool TryRelocate(Piece piece, int toRow, int toCol);
@@ -56,4 +50,8 @@ public interface IGameController
     public bool ResurrectPiece(bool team);
     public Vector2Int? GetResurrectionSquare(bool team);
 
+
+    // REMOVE LATER
+    bool IsWhiteTurn { get; }
+    public void CapturePiece(Piece captured, Piece winner);
 }
