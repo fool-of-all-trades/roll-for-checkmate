@@ -3,9 +3,13 @@
 public class TurnManager
 {
     readonly bool whiteStarts = true;
+
     public bool WhiteTurn { get; private set; }
 
+    /// <summary>Square eligible for en passant capture (can be null).</summary>
     public (int row, int col)? EnPassantSquare { get; private set; }
+
+    /// <summary>Pawn that just moved two squares, enabling en passant.</summary>
     public Pawn LastDoubleStepPawn { get; private set; }
 
     public TurnManager() =>  (WhiteTurn) = (whiteStarts);
@@ -16,11 +20,9 @@ public class TurnManager
 
         WhiteTurn = !WhiteTurn;
 
-
         // If the en‑passant square was created by the side that just moved,
-        // the *next* toggle (i.e. after the opponent’s reply) should clear it.
-        if (LastDoubleStepPawn != null &&
-            LastDoubleStepPawn.Team == WhiteTurn)    // we’re back to the creator’s turn
+        // the *next* toggle (after the opponent’s reply) should clear it.
+        if (LastDoubleStepPawn != null && LastDoubleStepPawn.Team == WhiteTurn)
         {
             EnPassantSquare = null;
             LastDoubleStepPawn = null;
