@@ -9,7 +9,7 @@ public class DuelService : MonoBehaviour, IDuelService
     // Injected deps
     Func<int, int, Piece> pieceAt;       // board lookup
     Func<bool, Piece> getKing;       // if you need
-    ICurseService curses;        // optional, for -3
+    ICurseService curses;
     int boardMin = 0, boardMax = 7;
 
     public void Init(Func<int, int, Piece> pieceAt,
@@ -62,7 +62,6 @@ public class DuelService : MonoBehaviour, IDuelService
 
         return 0;
     }
-
     int CalcKnightRearBonus(Piece attacker, Piece defender)
     {
         if (attacker is not Knight || defender == null) return 0;

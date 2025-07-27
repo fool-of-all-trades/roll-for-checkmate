@@ -202,7 +202,7 @@ public class ChessBoard : MonoBehaviour
 
     private void MovePiece(Piece p, int row, int col)
     {
-        p.SetGridPosition(row, col);
+        p.SetViewPosition(row, col);
     }
 
     private void OnUltimateButtonClicked()

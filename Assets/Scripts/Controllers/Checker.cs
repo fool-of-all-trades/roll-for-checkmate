@@ -21,7 +21,7 @@ namespace Controller
             _pieceAt = pieceAt;
         }
 
-        #region Range checks (use _pieceAt instead of board.GetPieceAt)
+        #region Range checks
         private bool RangeOfBishopOrQueen()
         {
             Vector2Int[] directions = {

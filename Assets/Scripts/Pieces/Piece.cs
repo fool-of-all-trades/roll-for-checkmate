@@ -6,7 +6,6 @@ namespace Pieces
     [RequireComponent(typeof(SpriteRenderer))]
     public abstract class Piece : MonoBehaviour
     {
-
         [Header("Team Sprites")]
         public Sprite whiteSprite;
         public Sprite blackSprite;
@@ -17,8 +16,9 @@ namespace Pieces
         protected Ability ultimateAbility;
 
         public ChessBoard board;
+
         protected string pieceName;
-        protected int level = 1;
+        protected int level = 1; // max level is 5
         protected bool team; // true = white, false = black
         protected int row, col;
         protected int cursedTurns;
@@ -38,34 +38,44 @@ namespace Pieces
         public bool HasMoved { get => hasMoved; private set => hasMoved = value; }
         public string Name { get => pieceName; private set => pieceName = value; }
         #endregion
+        public void Init(ChessBoard boardCtx, int startRow, int startCol, bool team)
+        {
+            this.board = boardCtx;
 
-        #region Grid Management
-        public void SetGridPosition(int newRow, int newCol)
+            this.Team = team;
+
+            if (spriteRenderer != null)
+                spriteRenderer.sprite = this.Team ? whiteSprite : blackSprite;
+
+            // set the grid coords + set the transform.position so the Piece appears in the right place
+            this.Row = startRow;
+            this.Col = startCol;
+
+            SetViewPosition(startRow, startCol);
+        }
+
+        /// <summary>
+        /// Sets row/col and the GameObject’s transform.position.
+        /// Used in the ChessBoard (view layer).
+        /// </summary>
+        /// <param name="newRow"></param>
+        /// <param name="newCol"></param>
+        public void SetViewPosition(int newRow, int newCol)
         {
             row = newRow;
             col = newCol;
             transform.position = board.GridToWorld(newRow, newCol);
         }
 
+        /// <summary>
+        /// Sets row/col but does not touch the GameObject’s transform.position.
+        /// Used in the controller/services (logic layer).
+        /// </summary>
         public void SetBoardCoords(int r, int c)
         {
+            //if it did update the transform.position then the Piece would teleport twice
             row = r;
             col = c;
-        }
-
-        public void Init(ChessBoard boardCtx, int startRow, int startCol, bool team)
-        {
-            this.board = boardCtx;
-
-            // set the grid coords + move the transform
-            this.Row = startRow;
-            this.Col = startCol;
-            this.Team = team;
-
-            if (spriteRenderer != null)
-                spriteRenderer.sprite = this.Team ? whiteSprite : blackSprite;
-
-            SetGridPosition(startRow, startCol);
         }
 
         public void ChangeTeam(bool newTeam)
@@ -77,25 +87,15 @@ namespace Pieces
         }
 
         public void MarkMoved() => hasMoved = true;
+
+        public void UpdateLevel(int delta) => level += delta;
+
         public void DecreaseCursedTurns()
         {
             if (cursedTurns > 0) cursedTurns--;
         }
 
-        public void UpdateLevel(int delta)
-        {
-            level += delta;
-        }
-
         public void SetCursedTurns(int t) => cursedTurns = t;
-        #endregion
-
-        #region Abilities
-        public void UseBaseAbility(IGameController controller)
-        {
-            if (baseAbility != null && cursedTurns == 0)
-                baseAbility.UseAbility(controller, this);
-        }
 
         public void UseUltimateAbility(IGameController controller)
         {
@@ -103,12 +103,15 @@ namespace Pieces
                 ultimateAbility.UseAbility(controller, this);
         }
 
+        /// <summary>
+        /// Checks if the ultimate ability can be used based on the piece's level and cursed turns.
+        /// </summary>
         public bool CanUseUltimate()
             => ultimateAbility != null && ultimateAbility.CanUseUltimate(level) && cursedTurns == 0;
-        #endregion
 
         /// <summary>
-        /// Implements the specific movement rules for each piece type.
+        /// Implements the specific geometrical movement rules for each piece type.
+        /// No checking safety, that's the controller's job.
         /// </summary>
         public abstract bool IsValidMove(int newRow, int newCol);
     }
