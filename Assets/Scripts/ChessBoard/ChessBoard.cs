@@ -275,8 +275,23 @@ public class ChessBoard : MonoBehaviour
     // Event methods are called automatically when the given event raises
     private void ApplyMoveVisuals(MoveResult m)
     {
-        // move the winner’s prefab
-        MovePiece(m.Piece, m.ToRow, m.ToCol);
+        if (m.FromRow < 0)
+        {
+            // spawned by Bishop's ultimate
+            var p = m.Piece;
+
+            // 1. Register in the board’s lookup grid  (so clicks find it)
+            if (!pieces.Contains(p))
+                pieces.Add(p);
+
+            // 2. Move the prefab to the correct world position
+            p.SetViewPosition(m.ToRow, m.ToCol);
+        }
+        else
+        {
+            // normal move
+            MovePiece(m.Piece, m.ToRow, m.ToCol);
+        }
 
         // hide the loser if there was a capture
         if (m.Captured != null) HideCapturedPiece(m.Captured);
