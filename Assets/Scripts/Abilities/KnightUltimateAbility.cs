@@ -30,23 +30,21 @@ namespace Abilities
             // Ask the view (ChessBoard) to start target-selection mode.
             ChessBoard board = owner.board;
 
+            // I know it looks confusing but this is just passing two functions as parameters
             board.BeginTargetSelection(
-                target => target != null && target.Team != owner.Team,
-                target =>
+                filter: (target => target != null && target.Team != owner.Team),
+                onChosen: (target =>
                 {
-                    if (target == null)
-                    {
-                        Debug.Log("No target selected – ultimate cancelled.");
-                        return;
-                    }
-
                     Debug.Log($"Knight DIVINE SMITES the shit out of {target.Name}!");
+
                     target.UpdateLevel(1 - target.Level);
                     target.SetStunnedTurns(2);
+
                     usedUltimate = true;
 
                     // TODO: fire an event so UI can flash the target square
-                });
+                })
+            );
         }
     }
 }

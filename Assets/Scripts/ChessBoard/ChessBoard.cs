@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 using Pieces;
 using TMPro;
+using System;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
 
@@ -38,6 +39,9 @@ public class ChessBoard : MonoBehaviour
 
     private Piece selectedPiece;
     private Piece infoPiece;
+
+    private Action<Piece> pendingTargetCallback;
+    private bool targetMode;   // when true, HandleClick calls the pendingTargetCallback
 
     [Header("References")]
     [SerializeField] private MonoBehaviour controllerRoot; 
@@ -227,6 +231,7 @@ public class ChessBoard : MonoBehaviour
     {
         var clickedPiece = GetPieceAt(row, col);
 
+        // targetMode is for when Knight's ultimate is active
         if (targetMode)
         {
             pendingTargetCallback?.Invoke(clickedPiece);
@@ -316,16 +321,16 @@ public class ChessBoard : MonoBehaviour
     }
     #endregion
 
-    private System.Action<Piece> pendingTargetCallback;
-    private bool targetMode;   // when true, clicks call the callback
-
-    public void BeginTargetSelection(System.Predicate<Piece> filter,
-                                 System.Action<Piece> onChosen)
+    public void BeginTargetSelection(Predicate<Piece> filter, Action<Piece> onChosen)
     {
         targetMode = true;
+
         pendingTargetCallback = p =>
         {
+            // once target isn't null and is enemy we call onChosen which performs DIVINE SMITE
             if (filter(p)) onChosen(p);
+            else Debug.Log("Target selection failed: piece does not match filter.");
+
             targetMode = false;
             pendingTargetCallback = null;
         };

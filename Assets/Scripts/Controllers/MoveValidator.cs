@@ -12,7 +12,7 @@ namespace Controller
     {
         // --------------  DEPENDENCIES  --------------
         readonly TurnManager turnMgr;
-        readonly Func<int, int, Piece> pieceAt;   // board lookup
+        readonly Func<int, int, Piece> pieceAt;
         readonly Checker checker;
         readonly Func<bool, Piece> getKing;
         readonly IGameController controller;
