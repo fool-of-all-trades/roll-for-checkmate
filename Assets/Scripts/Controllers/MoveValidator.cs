@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Pieces;
 
 namespace Controller
@@ -84,7 +84,9 @@ namespace Controller
             return true;
         }
 
-        // --------------  Piece-specific geometry & path  --------------
+        /// <summary>
+        /// Verifies piece‑specific geometric movement path and target occupancy.
+        /// </summary>
         bool GeometryAndDestinationOk(Piece piece, int fr, int fc, int tr, int tc)
         {
             switch (piece)
@@ -120,13 +122,20 @@ namespace Controller
             }
         }
 
+        /// <summary>
+        /// True if target square is empty or holds an enemy piece.
+        /// </summary>
         bool DestinationOk(Piece mover, int r, int c)
         {
             var target = pieceAt(r, c);
             return target == null || target.Team != mover.Team;
         }
 
-        // --------------  Pawn helpers  --------------
+        #region Pawn helpers
+
+        /// <summary>
+        /// Checks pawn’s move shape: single/double forward or diagonal capture.
+        /// </summary>
         bool ValidatePawnShape(Pawn pawn, int fr, int fc, int tr, int tc)
         {
             int dir = pawn.Team ? 1 : -1;
@@ -147,6 +156,9 @@ namespace Controller
             return false;
         }
 
+        /// <summary>
+        /// Verifies pawn path is clear and handles captures or en‑passant eligibility.
+        /// </summary>
         bool PawnPathOk(Pawn pawn, int fr, int fc, int tr, int tc)
         {
             int dir = pawn.Team ? 1 : -1;
@@ -170,11 +182,17 @@ namespace Controller
             var epsq = turnMgr.EnPassantSquare;
             return epsq.HasValue && epsq.Value.row == tr && epsq.Value.col == tc;
         }
+        #endregion
 
-        // --------------  Castling helpers  --------------
+        #region Castling helpers
+
+        /// <summary>
+        /// Detects a king’s two‑square move and fetches the corresponding rook.
+        /// </summary>
         bool IsCastleAttempt(King king, int tr, int tc, out Rook rook)
         {
             rook = null;
+
             if (king.HasMoved || king.Row != tr || Math.Abs(tc - king.Col) != 2)
                 return false;
 
@@ -184,12 +202,15 @@ namespace Controller
             return rook != null;
         }
 
+        /// <summary>
+        /// Ensures rook unmoved, path empty, and no square crossed is under attack.
+        /// </summary>
         bool CastleRulesOk(King king, Rook rook, int fr, int fc, int tc)
         {
             // Rook must not have moved
             if (rook.HasMoved) return false;
 
-            // Squares between king & rook empty
+            // Squares between king and rook empty
             if (!PathUtils.PathClearExceptEndpoints(pieceAt, king.Row, fc, rook.Col)) return false;
 
             // Squares the king crosses must be safe
@@ -200,14 +221,15 @@ namespace Controller
             return true;
         }
 
-        // --------------  King-safety  --------------
+        /// <summary>
+        /// Simulates the move and returns false if it would leave the king in check.
+        /// </summary>
         bool SquaresSafeForCurrentSide(Piece mover, int kingDestRow, int kingDestCol)
         {
-            // checker.PredictDanger already simulates piece movement for us
-            return !checker.PredictDanger(mover,
-                                          getKing(mover.Team),
+            return !checker.PredictDanger(mover, getKing(mover.Team),
                                           kingDestRow, kingDestCol,
                                           controller);
         }
+        #endregion
     }
 }
