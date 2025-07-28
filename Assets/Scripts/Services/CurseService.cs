@@ -52,4 +52,5 @@ public class CurseService : MonoBehaviour, ICurseService
     /// Determines if a piece is currently cursed.
     /// </summary>
     public bool IsCursed(Piece piece) => piece != null && piece.CursedTurns > 0;
+
 }

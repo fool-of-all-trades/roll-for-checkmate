@@ -227,6 +227,12 @@ public class ChessBoard : MonoBehaviour
     {
         var clickedPiece = GetPieceAt(row, col);
 
+        if (targetMode)
+        {
+            pendingTargetCallback?.Invoke(clickedPiece);
+            return;   // ignore normal selection logic while targeting for DIVINE SMITE
+        }
+
         if (selectedPiece == null)
             SelectPiece(row, col);
         else if (clickedPiece != null && clickedPiece.Team == selectedPiece.Team)
@@ -309,4 +315,19 @@ public class ChessBoard : MonoBehaviour
         // paint tiles, show highlights for sacred road, sparkly stuff
     }
     #endregion
+
+    private System.Action<Piece> pendingTargetCallback;
+    private bool targetMode;   // when true, clicks call the callback
+
+    public void BeginTargetSelection(System.Predicate<Piece> filter,
+                                 System.Action<Piece> onChosen)
+    {
+        targetMode = true;
+        pendingTargetCallback = p =>
+        {
+            if (filter(p)) onChosen(p);
+            targetMode = false;
+            pendingTargetCallback = null;
+        };
+    }
 }

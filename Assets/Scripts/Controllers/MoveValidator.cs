@@ -51,6 +51,9 @@ namespace Controller
         {
             analysis = default;
 
+            // -1) Piece can't move cuz of Divine Smite
+            if (piece.IsStunned()) return false;
+
             // 0) Null / wrong turn / shape
             if (piece == null ||
                 piece.Team != turnMgr.WhiteTurn ||

@@ -1,4 +1,7 @@
-﻿using Pieces;
+﻿using Controller;
+using Pieces;
+using System;
+using System.Collections.Generic;
 
 public class TurnManager
 {
@@ -12,7 +15,10 @@ public class TurnManager
     /// <summary>Pawn that just moved two squares, enabling en passant.</summary>
     public Pawn LastDoubleStepPawn { get; private set; }
 
-    public TurnManager() =>  (WhiteTurn) = (whiteStarts);
+    public TurnManager()
+    {
+        WhiteTurn = whiteStarts;
+    }
 
     public void ToggleTurn()
     {

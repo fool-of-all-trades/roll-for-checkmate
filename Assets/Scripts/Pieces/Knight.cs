@@ -11,8 +11,8 @@ namespace Pieces
         {
             pieceName = "Knight";
             level = 2;
-            // there ain't one yet
-            //ultimateAbility = new KnightUltimateAbility(5);
+
+            ultimateAbility = new KnightUltimateAbility(5);
         }
 
         /// <summary>

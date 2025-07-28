@@ -64,7 +64,7 @@ namespace Controller
 
         MoveValidator validator;
         TurnManager turnMgr;
-        CaptureManager captureManager = new();
+        CaptureManager captureManager;
 
         [SerializeField] private MonoBehaviour duelServiceRoot;  // drag in Inspector
         IDuelService duels;
@@ -82,6 +82,7 @@ namespace Controller
         {
             checker = new Checker(PieceAt);
             turnMgr = new TurnManager();
+            captureManager = new CaptureManager();
             validator = new MoveValidator(turnMgr, PieceAt, checker, GetKing, this);
 
             duels = (IDuelService)duelServiceRoot;
@@ -122,6 +123,10 @@ namespace Controller
 
                         turnMgr.ToggleTurn();
                         queensCurse.TickTurn();
+
+                        foreach (var stunnedPiece in pieces)
+                            stunnedPiece.TickStunnedTurns();
+
                         return true;
                     }
                     // else fall through: attacker wins, defender captured
@@ -194,7 +199,11 @@ namespace Controller
             sacredRoad.ProcessMove(piece);
 
             turnMgr.ToggleTurn();          // flip side & clear old en‑passant square
-            queensCurse.TickTurn(); 
+            queensCurse.TickTurn();
+
+            foreach (var stunnedPiece in pieces)
+                stunnedPiece.TickStunnedTurns();
+
             return true;
         }
 

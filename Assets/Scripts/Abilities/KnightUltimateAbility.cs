@@ -1,31 +1,52 @@
 using Pieces;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace Abilities
 {
     /// <summary>
-    /// Knight's ultimate ability: Divine Smite
-    /// One enemy piece can be striked, and it's level turns to 1,
-    /// and it can't move for one turn
+    /// Knight ultimate – "Divine Smite".
+    /// Player clicks one enemy piece anywhere:
+    ///   • that piece’s Level becomes 1
+    ///   • it is stunned for 1 full turn (cannot move)
     /// </summary>
     public class KnightUltimateAbility : Ability
     {
-        public KnightUltimateAbility(int levelRequirement) : base(levelRequirement) { }
+        public KnightUltimateAbility(int levelReq) : base(levelReq) { }
 
         public override void UseAbility(IGameController controller, Piece owner)
         {
             if (usedUltimate)
             {
-                Debug.Log("Ultimate already used.");
+                Debug.Log("Knight ultimate already used.");
                 return;
             }
 
-            int ownerRow = owner.Row;
-            int ownerCol = owner.Col;
+            if (owner.StunnedTurns > 0)
+            {
+                Debug.Log("Knight is stunned and cannot use abilities.");
+                return;
+            }
 
-            Piece target = null;
+            // Ask the view (ChessBoard) to start target-selection mode.
+            ChessBoard board = owner.board;
+
+            board.BeginTargetSelection(
+                target => target != null && target.Team != owner.Team,
+                target =>
+                {
+                    if (target == null)
+                    {
+                        Debug.Log("No target selected – ultimate cancelled.");
+                        return;
+                    }
+
+                    Debug.Log($"Knight DIVINE SMITES the shit out of {target.Name}!");
+                    target.UpdateLevel(1 - target.Level);
+                    target.SetStunnedTurns(2);
+                    usedUltimate = true;
+
+                    // TODO: fire an event so UI can flash the target square
+                });
         }
     }
 }

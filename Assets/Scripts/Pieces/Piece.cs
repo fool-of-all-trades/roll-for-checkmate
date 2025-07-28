@@ -22,6 +22,7 @@ namespace Pieces
         protected bool team; // true = white, false = black
         protected int row, col;
         protected int cursedTurns;
+        protected int stunnedTurns;
         protected bool hasMoved;
 
         private void Awake()
@@ -37,7 +38,9 @@ namespace Pieces
         public int CursedTurns { get => cursedTurns; private set => cursedTurns = value; }
         public bool HasMoved { get => hasMoved; private set => hasMoved = value; }
         public string Name { get => pieceName; private set => pieceName = value; }
+        public int StunnedTurns { get => stunnedTurns; private set => stunnedTurns = value; }
         #endregion
+
         public void Init(ChessBoard boardCtx, int startRow, int startCol, bool team)
         {
             this.board = boardCtx;
@@ -96,6 +99,15 @@ namespace Pieces
         }
 
         public void SetCursedTurns(int t) => cursedTurns = t;
+
+        public void SetStunnedTurns(int turns) => stunnedTurns = turns;
+
+        public void TickStunnedTurns() 
+        { 
+            if (stunnedTurns > 0) stunnedTurns--; 
+        }
+
+        public bool IsStunned() => this != null && this.StunnedTurns > 0;
 
         public void UseUltimateAbility(IGameController controller)
         {
