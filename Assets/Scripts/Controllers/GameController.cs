@@ -9,64 +9,38 @@ namespace Controller
     [DisallowMultipleComponent]
     public class GameControllerMono : MonoBehaviour, IGameController
     {
-        /* ───────────── IGameController event contracts ───────────── */
+        List<Piece> pieces;
+
+        /// <summary>
+        /// Called once by ChessBoard in Awake to give us the live piece list.
+        /// </summary>
+        public void Initialize(IEnumerable<Piece> allPieces)
+        {
+            pieces = new List<Piece>(allPieces);
+        }
+
+        /* ───────────── GameController event contracts ───────────── */
 
         public event Action<MoveResult> OnMoveAccepted;
         public event Action<int> OnDuelRolled;
 
-        public event Action<IReadOnlyList<Vector2Int>, IReadOnlyList<Vector2Int>> OnRoadsChanged
+        public event Action<
+            IReadOnlyList<Vector2Int>, 
+            IReadOnlyList<Vector2Int>
+            > OnRoadsChanged
         {
             add => sacredRoad.OnRoadsChanged += value;
             remove => sacredRoad.OnRoadsChanged -= value;
         }
 
+        /* ────────────────────── Services ───────────────────────── */
 
-        /// <summary>Called once by ChessBoard in Awake to give us the live piece list.</summary>
-        public void Initialize(IEnumerable<Piece> allPieces) =>
-            pieces = new List<Piece>(allPieces);
-
-        
-        public Piece PieceAt(int row, int col) =>
-            pieces.FirstOrDefault(p => p.Row == row && p.Col == col);
-
-        /* ───────────── public helpers (unchanged from old GC) ───────────── */
-
-        public Piece GetKing(bool team) =>
-            pieces.FirstOrDefault(p => p is King && p.Team == team);
-
-        public bool IsCheck(Piece king, Piece lastPiece) =>
-            lastPiece.IsValidMove(king.Row, king.Col);
-
-        public bool CheckCheck(Piece piece, int destRow, int destCol) =>
-            checker.PredictDanger(piece, GetKing(piece.Team), destRow, destCol, this);
-
-        public bool IsGameOver(Piece lastMovedPiece)
-        {
-            bool teamToMove = turnMgr.WhiteTurn;
-            Piece king = GetKing(teamToMove);
-
-            foreach (var p in pieces.Where(x => x.Team == teamToMove))
-            {
-                for (int r = 0; r < 8; r++)
-                    for (int c = 0; c < 8; c++)
-                        if (p.IsValidMove(r, c) && !CheckCheck(p, r, c))
-                            return false;
-            }
-
-            Debug.Log(IsCheck(king, lastMovedPiece) ? "CheckMate!" : "StaleMate!");
-            return true;
-        }
-
-        /* ───────────── internal state & helpers ───────────── */
-
-        List<Piece> pieces;                 // set in Initialize()
-        Checker checker;                    // same class you had before
-
-        MoveValidator validator;
+        Checker checker;
         TurnManager turnMgr;
         CaptureManager captureManager;
+        MoveValidator validator;
 
-        [SerializeField] private MonoBehaviour duelServiceRoot;  // drag in Inspector
+        [SerializeField] private MonoBehaviour duelServiceRoot;
         IDuelService duels;
 
         [SerializeField] private MonoBehaviour curseServiceRoot;
@@ -94,6 +68,11 @@ namespace Controller
             resurrector.Init(PieceAt, AddPieceToBoard, captureManager);
         }
 
+        /// <summary>
+        /// Attempts to move a piece. Handles captures, duels, special rules, and events.
+        /// Legality of the movement is checked before in the MoveValidator.IsLegalMove method.
+        /// </summary>
+        /// <returns>True if moved, false if move not possible</returns>
         public bool TryMove(Piece piece, int toRow, int toCol)
         {
             if (!validator.IsLegalMove(piece, toRow, toCol, out var info))
@@ -218,7 +197,9 @@ namespace Controller
             return true;
         }
 
-        // for the King's ultimate
+        /// <summary>
+        /// Relocates a piece instantly if destination is empty (used for King ultimate).
+        /// </summary>
         public bool TryRelocate(Piece piece, int toRow, int toCol)
         {
             if (PieceAt(toRow, toCol) != null) return false;
@@ -231,19 +212,62 @@ namespace Controller
             return true;
         }
 
+        /// <summary>
+        /// Finds the Piece at a given board coordinate, or null if empty.
+        /// </summary>
+        public Piece PieceAt(int row, int col) =>
+            pieces.FirstOrDefault(p => p.Row == row && p.Col == col);
+
+        /// <summary>
+        /// Retrieves the king Piece for the specified team.
+        /// </summary>
+        public Piece GetKing(bool team) =>
+            pieces.FirstOrDefault(p => p is King && p.Team == team);
+
+        public bool IsCheck(Piece king, Piece lastPiece) =>
+            lastPiece.IsValidMove(king.Row, king.Col);
+
+        public bool CheckCheck(Piece piece, int destRow, int destCol) =>
+            checker.PredictDanger(piece, GetKing(piece.Team), destRow, destCol, this);
+
+        /// <summary>
+        /// Determines if the current side has no legal moves (checkmate or stalemate).
+        /// </summary>
+        public bool IsGameOver(Piece lastMovedPiece)
+        {
+            bool teamToMove = turnMgr.WhiteTurn;
+            Piece king = GetKing(teamToMove);
+
+            foreach (var p in pieces.Where(x => x.Team == teamToMove))
+            {
+                for (int r = 0; r < 8; r++)
+                    for (int c = 0; c < 8; c++)
+                        if (p.IsValidMove(r, c) && !CheckCheck(p, r, c))
+                            return false;
+            }
+
+            Debug.Log(IsCheck(king, lastMovedPiece) ? "CheckMate!" : "StaleMate!");
+            return true;
+        }
+
+        /// <summary>
+        /// Generates the squares between two positions along a diagonal (excluding both endpoints).
+        /// </summary>
         List<Vector2Int> BuildBishopPath(int fr, int fc, int tr, int tc)
         {
             var list = new List<Vector2Int>();
             int dr = Math.Sign(tr - fr);
             int dc = Math.Sign(tc - fc);
 
-            // squares BETWEEN start and end (exclude both ends)
             for (int r = fr + dr, c = fc + dc; r != tr && c != tc; r += dr, c += dc)
                 list.Add(new Vector2Int(r, c));
 
             return list;
         }
 
+        /// <summary>
+        /// Places or re‐adds a Piece in the game’s piece list and raises a spawn event.
+        /// </summary>
         private void AddPieceToBoard(Piece p, int row, int col)
         {
             // Add to our authoritative list
@@ -257,6 +281,7 @@ namespace Controller
             OnMoveAccepted?.Invoke(new MoveResult(p, -1, -1, row, col));
         }
 
+        // Proxies
         public bool ResurrectPawn(bool team) => resurrector.ResurrectPawn(team);
         public bool ResurrectPiece(bool team) => resurrector.ResurrectPiece(team);
         public Vector2Int? GetResurrectionSquare(bool team) => resurrector.GetResurrectionSquare(team);
@@ -266,7 +291,6 @@ namespace Controller
         // expose current side
         public bool IsWhiteTurn => turnMgr.WhiteTurn;
 
-        // GameControllerMono.cs
         public void CapturePiece(Piece captured, Piece winner)
         {
             captureManager.CapturePiece(pieces, captured, winner);
