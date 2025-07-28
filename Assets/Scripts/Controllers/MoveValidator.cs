@@ -63,7 +63,7 @@ namespace Controller
             int fr = piece.Row, fc = piece.Col;
 
             // 1) Path & destination (per piece type)
-            if (!GeometryAndDestinationOk(piece, fr, fc, toRow, toCol))
+            if (!PathClearAndDestinationOk(piece, fr, fc, toRow, toCol))
                 return false;
 
             // 2) Castling extra rules
@@ -85,9 +85,9 @@ namespace Controller
         }
 
         /// <summary>
-        /// Verifies piece‑specific geometric movement path and target occupancy.
+        /// Verifies piece‑specific path and target occupancy.
         /// </summary>
-        bool GeometryAndDestinationOk(Piece piece, int fr, int fc, int tr, int tc)
+        bool PathClearAndDestinationOk(Piece piece, int fr, int fc, int tr, int tc)
         {
             switch (piece)
             {
@@ -112,8 +112,9 @@ namespace Controller
                     return DestinationOk(piece, tr, tc);
 
                 case Pawn p:
-                    return ValidatePawnShape(p, fr, fc, tr, tc)
-                           && PawnPathOk(p, fr, fc, tr, tc);
+                    //return ValidatePawnShape(p, fr, fc, tr, tc)
+                    //       && PawnPathOk(p, fr, fc, tr, tc);
+                    return PawnPathOk(p, fr, fc, tr, tc);
 
                 case King:
                     return DestinationOk(piece, tr, tc);
@@ -129,31 +130,6 @@ namespace Controller
         {
             var target = pieceAt(r, c);
             return target == null || target.Team != mover.Team;
-        }
-
-        #region Pawn helpers
-
-        /// <summary>
-        /// Checks pawn’s move shape: single/double forward or diagonal capture.
-        /// </summary>
-        bool ValidatePawnShape(Pawn pawn, int fr, int fc, int tr, int tc)
-        {
-            int dir = pawn.Team ? 1 : -1;
-            int rowDiff = tr - fr;
-            int colDiff = tc - fc;
-
-            bool atStart = (pawn.Team && fr == 1) || (!pawn.Team && fr == 6);
-
-            // Forward 1 / 2
-            if (colDiff == 0 &&
-                (rowDiff == dir || (atStart && rowDiff == 2 * dir)))
-                return true;
-
-            // Diagonal capture/en-passant shape
-            if (Math.Abs(colDiff) == 1 && rowDiff == dir)
-                return true;
-
-            return false;
         }
 
         /// <summary>
@@ -176,13 +152,12 @@ namespace Controller
             }
 
             // Diagonal: must capture something OR match en-passant square
-            var target = pieceAt(tr, tc);
-            if (target != null && target.Team != pawn.Team) return true;
+            if (DestinationOk(pawn, tr, tc) && pieceAt(tr, tc) != null)
+                return true;
 
             var epsq = turnMgr.EnPassantSquare;
             return epsq.HasValue && epsq.Value.row == tr && epsq.Value.col == tc;
         }
-        #endregion
 
         #region Castling helpers
 

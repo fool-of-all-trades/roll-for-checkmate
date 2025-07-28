@@ -70,12 +70,13 @@ Boss nr 1: Setup i przygotowanie projektu
 
 1.8.2 Nieprzewidziane zjazdy z autostrady:
 ✅  Naprawić wskrzeszanie pionków przez biskupa
-🔲  Naprawić że po tym jak król umiera nie ma game over (jak zestrzeli go wieżyczka XD)
 ✅  Sprawdzić czy sacred road wogóle działa (spoiler alert, nie działał, ale już działa)
-🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca, może randomowa umiejętność + możliwość ruszania się w przód i tył o jeden?)
-🔲  2 Audio Listenery są no bo każda ze scen ma kamerę i każda z kamer listener, Unity to przeszkadza (ale jak zrobi się przechodzenie między scenami to powinno się to samo naprawić)
 ✅  Naprawić to że jak Bishop kogoś wskrzesi to pionek się pojawia ale nie da się go kliknąć
 ✅  Konika ostateczna umiejętność nadal w trakcie pisania
+🔲  Naprawić że po tym jak król umiera nie ma game over (jak zestrzeli go wieżyczka XD)
+🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca, może randomowa umiejętność + możliwość ruszania się w przód i tył o jeden?)
+🔲  2 Audio Listenery są no bo każda ze scen ma kamerę i każda z kamer listener, Unity to przeszkadza (ale jak zrobi się przechodzenie między scenami to powinno się to samo naprawić)
+🔲  Dorobić opcję wyboru kogo chce wieżyczka zestrzelić bo jak na razie to pierwszy poprawny jest brany
 
 1.9 Gra działa?
 🔲  Działa
