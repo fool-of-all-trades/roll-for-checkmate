@@ -36,6 +36,7 @@ Boss nr 1: Setup i przygotowanie projektu
 🔲  Podświetlanie możliwych do wyboru pól
 🔲  Podświetlanie świętej ścieżki
 🔲  Ładniejsze wyświetlanie info
+🔲  Stworzyć scenę końcową, game over, win, stalemate itd (jak będzie online to wtedy trzeba będzie w zależności od gracza wyświetlić odpowiednią)
 
 1.5 Przepisać pliki z pionkami:
 ✅  Bishop
@@ -69,7 +70,7 @@ Boss nr 1: Setup i przygotowanie projektu
 
 1.8.2 Nieprzewidziane zjazdy z autostrady:
 ✅  Naprawić wskrzeszanie pionków przez biskupa
-🔲  Naprawić że po tym jak król umiera nie ma game over
+🔲  Naprawić że po tym jak król umiera nie ma game over (jak zestrzeli go wieżyczka XD)
 ✅  Sprawdzić czy sacred road wogóle działa (spoiler alert, nie działał, ale już działa)
 🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca, może randomowa umiejętność + możliwość ruszania się w przód i tył o jeden?)
 🔲  2 Audio Listenery są no bo każda ze scen ma kamerę i każda z kamer listener, Unity to przeszkadza (ale jak zrobi się przechodzenie między scenami to powinno się to samo naprawić)

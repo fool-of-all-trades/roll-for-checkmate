@@ -94,7 +94,6 @@ namespace Controller
             resurrector.Init(PieceAt, AddPieceToBoard, captureManager);
         }
 
-
         public bool TryMove(Piece piece, int toRow, int toCol)
         {
             if (!validator.IsLegalMove(piece, toRow, toCol, out var info))
@@ -126,6 +125,12 @@ namespace Controller
 
                         foreach (var stunnedPiece in pieces)
                             stunnedPiece.TickStunnedTurns();
+
+                        if (IsGameOver(piece))
+                        {
+                            //OnGameOver?.Invoke();               // <- add an event so ChessBoard can show UI
+                            return true;                        // game ends
+                        }
 
                         return true;
                     }
@@ -203,6 +208,12 @@ namespace Controller
 
             foreach (var stunnedPiece in pieces)
                 stunnedPiece.TickStunnedTurns();
+
+            if (IsGameOver(piece))
+            {
+                //OnGameOver?.Invoke();               // <- add an event so ChessBoard can show UI
+                return true;                        // game ends
+            }
 
             return true;
         }
