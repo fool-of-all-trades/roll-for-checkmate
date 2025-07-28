@@ -20,6 +20,12 @@ namespace Abilities
                 return;
             }
 
+            if (owner.StunnedTurns > 0)
+            {
+                Debug.Log("Rook is stunned and cannot use abilities.");
+                return;
+            }
+
             ChessBoard board = owner.board;
             int kr = owner.Row;
             int kc = owner.Col;

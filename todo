@@ -73,10 +73,10 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Sprawdzić czy sacred road wogóle działa (spoiler alert, nie działał, ale już działa)
 ✅  Naprawić to że jak Bishop kogoś wskrzesi to pionek się pojawia ale nie da się go kliknąć
 ✅  Konika ostateczna umiejętność nadal w trakcie pisania
+✅  Dorobić opcję wyboru kogo chce wieżyczka zestrzelić bo jak na razie to pierwszy poprawny jest brany
 🔲  Naprawić że po tym jak król umiera nie ma game over (jak zestrzeli go wieżyczka XD)
 🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca, może randomowa umiejętność + możliwość ruszania się w przód i tył o jeden?)
 🔲  2 Audio Listenery są no bo każda ze scen ma kamerę i każda z kamer listener, Unity to przeszkadza (ale jak zrobi się przechodzenie między scenami to powinno się to samo naprawić)
-🔲  Dorobić opcję wyboru kogo chce wieżyczka zestrzelić bo jak na razie to pierwszy poprawny jest brany
 
 1.9 Gra działa?
 🔲  Działa
@@ -108,6 +108,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 🔲  Fala odpychająca króla?
 🔲  Sniperka wieży? Laser? Piorun z nieba?
 🔲  Święta droga jakoś fajnie pojawiająca się i łamiąca/rozbijająca się jak szkło?
+🔲  DIVINE SMITE!!!
 🔲  
 
 2.5  Dźwięk
@@ -129,9 +130,14 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 🔲  Game Over Screen – wynik (mat, poddanie, remis), przyciski „Restart” / „Exit to Menu”
 🔲  Suwaki głośności (efekty, muzyka)
 🔲  Opcja wyłączenia animacji
-🔲  Zasada 50 posunięć / trzykrotne powtórzenie pozycji
+🔲  Zasada 50 posunięć
+🔲  Trzykrotne powtórzenie pozycji
 🔲  
 
 2.8  Testy jednostkowe?
 🔲  💀💀💀
+🔲  
+
+2.9  Testy użytkowników
+🔲  Czy gra jest dobrze zbalansowana?
 🔲  

@@ -1,4 +1,5 @@
 using Pieces;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Abilities
@@ -20,61 +21,73 @@ namespace Abilities
                 return;
             }
 
-            int ownerRow = owner.Row;
-            int ownerCol = owner.Col;
+            if (owner.StunnedTurns > 0)
+            {
+                Debug.Log("Rook is stunned and cannot use abilities.");
+                return;
+            }
 
-            // Directions: up, down, right, left
+            // 1) Gather all valid targets
+            List<Piece> targets = FindTargets(controller, owner);
+            if (targets.Count == 0)
+            {
+                Debug.Log("No valid sniper targets.");
+                return;
+            }
+
+            // 2) Ask the board to start target-selection mode
+            ChessBoard board = owner.board;
+
+            board.BeginTargetSelection(
+                targets,
+                target =>
+                {
+                    if (target == null)
+                    {
+                        Debug.Log("Sniper shot canceled.");
+                        return;
+                    }
+
+                    controller.CapturePiece(target, owner);   // XP + hide prefab
+                    Debug.Log($"Rook sniped {target.Name} at ({target.Row},{target.Col})");
+                    usedUltimate = true;
+                }
+            );
+        }
+
+        /// <summary>
+        /// Returns every second enemy in rook rays.
+        /// </summary>
+        List<Piece> FindTargets(IGameController ctrl, Piece owner)
+        {
+            var list = new List<Piece>();
+            int r0 = owner.Row, c0 = owner.Col;
             var dirs = new (int dr, int dc)[] { (1, 0), (-1, 0), (0, 1), (0, -1) };
-
-            Piece target = null;
 
             foreach (var (dr, dc) in dirs)
             {
-                bool skippedFirst = false;
-                int r = ownerRow;
-                int c = ownerCol;
+                bool skipped = false;
+                int r = r0, c = c0;
 
                 while (true)
                 {
-                    r += dr;
-                    c += dc;
+                    r += dr; c += dc;
+                    if (r < 0 || r > 7 || c < 0 || c > 7) break;
 
-                    if (r < 0 || r > 7 || c < 0 || c > 7)      // board bounds
-                        break;
-
-                    Piece p = controller.PieceAt(r, c);
+                    Piece p = ctrl.PieceAt(r, c);
                     if (p == null) continue;
 
-                    if (!skippedFirst)
-                    {
-                        // Skip the first piece in that direction
-                        skippedFirst = true;
-                    }
+                    if (!skipped)
+                        skipped = true; // skip the first piece in this ray
                     else
                     {
-                        // This is the second piece; capture if enemy
                         if (p.Team != owner.Team)
-                            target = p;
-                        break;          // stop scanning this ray
+                            list.Add(p);          // second piece: enemy target
+                        break;                    // stop this ray
                     }
                 }
-
-                // so for now the first found is the one that gets shot
-                // but we could also add that all possible targets gets hilighted
-                // and the player can choose which one to shoot
-                if (target != null) break;   // found a victim -> stop other dirs
             }
-
-            if (target != null)
-            {
-                controller.CapturePiece(target, owner);   // XP for the rook + hide prefab of the victim
-                Debug.Log($"Rook sniped {target.Name} at ({target.Row},{target.Col})");
-                usedUltimate = true;
-            }
-            else
-            {
-                Debug.Log("No enemy behind a screen – ultimate not consumed.");
-            }
+            return list;
         }
     }
 }

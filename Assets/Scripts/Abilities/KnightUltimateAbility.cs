@@ -1,4 +1,5 @@
 using Pieces;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Abilities
@@ -30,11 +31,26 @@ namespace Abilities
             // Ask the view (ChessBoard) to start target-selection mode.
             ChessBoard board = owner.board;
 
+            List<Piece> allPieces = board.pieces;
+            List<Piece> targets = new List<Piece>();
+
+            foreach (var p in allPieces)
+            {
+                if (p.Team != owner.Team)
+                    targets.Add(p);
+            }
+
             // I know it looks confusing but this is just passing two functions as parameters
             board.BeginTargetSelection(
-                filter: (target => target != null && target.Team != owner.Team),
+                targets,
                 onChosen: (target =>
                 {
+                    if (target == null)
+                    {
+                        Debug.Log("Divine smite canceled.");
+                        return;
+                    }
+
                     Debug.Log($"Knight DIVINE SMITES the shit out of {target.Name}!");
 
                     target.UpdateLevel(1 - target.Level);

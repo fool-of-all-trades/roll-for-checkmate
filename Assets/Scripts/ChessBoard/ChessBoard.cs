@@ -6,6 +6,7 @@ using TMPro;
 using System;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
+using System.Linq;
 
 /// <summary>
 /// Renders the board, spawns pieces, handles input, and updates UI.
@@ -321,18 +322,51 @@ public class ChessBoard : MonoBehaviour
     }
     #endregion
 
-    public void BeginTargetSelection(Predicate<Piece> filter, Action<Piece> onChosen)
+    //public void BeginTargetSelection(Predicate<Piece> filter, Action<Piece> onChosen)
+    //{
+    //    targetMode = true;
+
+    //    pendingTargetCallback = p =>
+    //    {
+    //        // once target isn't null and is enemy we call onChosen which performs DIVINE SMITE
+    //        if (filter(p)) onChosen(p);
+    //        else Debug.Log("Target selection failed: piece does not match filter.");
+
+    //        targetMode = false;
+    //        pendingTargetCallback = null;
+    //    };
+    //}
+
+    public void BeginTargetSelection(
+        IReadOnlyList<Piece> targets,
+        Action<Piece> onChosen)
     {
         targetMode = true;
 
+        // highlight only targets
+        foreach (var p in targets) 
+            //HighlightSquare(p.Row, p.Col, Color.yellow);
+
         pendingTargetCallback = p =>
         {
-            // once target isn't null and is enemy we call onChosen which performs DIVINE SMITE
-            if (filter(p)) onChosen(p);
-            else Debug.Log("Target selection failed: piece does not match filter.");
-
-            targetMode = false;
-            pendingTargetCallback = null;
+            // only accept clicks on listed targets
+            if (!targetMode) return;
+            if (p != null && targets.Contains(p))
+            {
+                onChosen?.Invoke(p);
+                //ClearHighlights();
+                targetMode = false;
+                pendingTargetCallback = null;
+            }
+            else
+            {
+                // clicked elsewhere -> cancel
+                //ClearHighlights();
+                targetMode = false;
+                pendingTargetCallback = null;
+                onChosen?.Invoke(null);          // signal cancel
+            }
         };
     }
+
 }

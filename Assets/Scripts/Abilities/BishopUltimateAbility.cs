@@ -15,6 +15,18 @@ namespace Abilities
 
         public override void UseAbility(IGameController controller, Piece owner)
         {
+            if (usedUltimate)
+            {
+                Debug.Log("Ultimate already used.");
+                return;
+            }
+
+            if (owner.StunnedTurns > 0)
+            {
+                Debug.Log("Rook is stunned and cannot use abilities.");
+                return;
+            }
+
             int roll = Dice.Roll(20);
 
             if (roll <= 3)
