@@ -9,7 +9,7 @@ namespace Pieces
         private void Awake()
         {
             pieceName = "King";
-            level = 3;
+            level = 5;
             ultimateAbility = new KingUltimateAbility();
         }
 

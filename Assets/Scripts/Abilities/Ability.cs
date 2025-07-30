@@ -1,7 +1,7 @@
 using Pieces;
 using Controller;
 
-//King (level 3):
+//King (level 5):
 //Base Ability: one time, no leveling up required
 //
 //Queen (level 3, capture gives +3 level):

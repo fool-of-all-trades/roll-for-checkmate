@@ -74,8 +74,9 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Naprawić to że jak Bishop kogoś wskrzesi to pionek się pojawia ale nie da się go kliknąć
 ✅  Konika ostateczna umiejętność nadal w trakcie pisania
 ✅  Dorobić opcję wyboru kogo chce wieżyczka zestrzelić bo jak na razie to pierwszy poprawny jest brany
+✅  Z jakiegoś powodu pionki wciąż mogą jakimś cudem mieć level 6 mimo iż 5 powiniem być max
 🔲  Naprawić że po tym jak król umiera nie ma game over (jak zestrzeli go wieżyczka XD)
-🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca, może randomowa umiejętność + możliwość ruszania się w przód i tył o jeden?)
+🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca, więc zeskakują z planszy i pozwalają dodać +1 level do dowolnej figury gracza)
 🔲  2 Audio Listenery są no bo każda ze scen ma kamerę i każda z kamer listener, Unity to przeszkadza (ale jak zrobi się przechodzenie między scenami to powinno się to samo naprawić)
 
 1.9 Gra działa?
@@ -95,7 +96,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  GameController
 
 2.3  Implementacja multiplayera
-🔲  Wybrać rozwiązanie (Photon PUN2 / Mirror + Steam P2P / UGS)
+🔲  Wybrać rozwiązanie (Photon PUN2 / Mirror + Steam P2P / UGS) -> prawdopodobnie UGS
 🔲  Zainstalować pakiet i skonfigurować
 🔲  Stworzyć NetworkManager.cs z metodami Host()/Join()
 🔲  Dodać NetworkedPiece.cs (RPC Move, SyncVar Team/Position)
@@ -140,4 +141,14 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 
 2.9  Testy użytkowników
 🔲  Czy gra jest dobrze zbalansowana?
+🔲  
+
+Boss nr 3: Marketing i publikacja
+3.1 Marketing:
+🔲  Yt shorts? Tiktoks? 
+🔲  Wysłać jakimś streamerom i YouTuberom?
+🔲  
+
+3.2 Publikacja demo
+🔲  Na itch.io?
 🔲  

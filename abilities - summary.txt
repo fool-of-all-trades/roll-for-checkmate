@@ -1,0 +1,19 @@
+//King (level 5):
+//Base Ability: push away the enemies that are near (like a sound/shock wave?)
+//
+//Queen (level 3, capture gives +3 level):
+//Base Ability: after death she haunts her killer, her killer for 3 turns can't use abilities and has -3 bonus to rolls
+//
+//Bishop (level 2, capture gives +2 level):
+//Base Ability: sacred road, when enemy steps on the road it gets its level reduced by one, if level goes down to 0 the piece changes teams and gets level 1
+//Ultimate: can try to resurrect a piece, can resurrect an enemy though
+//
+//Knight (level 2, capture gives +2 level):
+//Base Ability: if is attacking from behind it gets +1 to rolls
+//Ultimate: can stun whichever enemy piece they want for 1 turn and reduces their level to 1
+//
+//Rook (level 2, capture gives +2 level):
+//Base Ability: gives +2 to rolls to any adjacent piece
+//Ultimate: can shoot a piece hidden behind a different piece
+//
+//Piece (level 1, capture gives +1 level): nothing for now

@@ -28,6 +28,10 @@ public class CaptureManager
         else blackCaptured.Add(captured);
 
         if (winner.Level < 5)
+        {
             winner.UpdateLevel(captured is Pawn ? 1 : 2);
+            if (winner.Level > 5)
+                winner.UpdateLevel(5 - winner.Level);
+        }
     }
 }

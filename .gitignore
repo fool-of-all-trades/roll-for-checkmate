@@ -13,6 +13,7 @@
 *.log
 
 refactoring phase 1.txt
+Refactoring part 1.docx
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
