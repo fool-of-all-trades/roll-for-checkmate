@@ -86,7 +86,9 @@ public class ChessBoard : MonoBehaviour
     {
         // Wait until the server has spawned everything
         while (pieces.Count < 32) yield return null;
-        controller.Initialize(pieces);       // black = client
+
+        pieces = new List<Piece>(FindObjectsOfType<Piece>());
+        controller.Initialize(pieces);
     }
 
     private void OnDestroy()
@@ -239,11 +241,10 @@ public class ChessBoard : MonoBehaviour
     {
         var p = GetPieceAt(row, col);
 
-        bool myTeamIsWhite = NetworkManager.Singleton.IsHost;
+        bool myTeamIsWhite = NetworkManager.Singleton.IsHost;     // host = white, client = black
+        bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
 
-        if (p != null &&
-            p.Team == myTeamIsWhite &&      // must be my team colour
-            p.Team == controller.IsWhiteTurn)   // and my turn
+        if (p != null && p.Team == myTeamIsWhite && isMyTurn)
         {
             selectedPiece = p;
         }
@@ -257,6 +258,10 @@ public class ChessBoard : MonoBehaviour
     private void AttemptMove(int destRow, int destCol)
     {
         if (selectedPiece == null) return;
+
+        bool myTeamIsWhite = NetworkManager.Singleton.IsHost;
+        bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
+        if (!isMyTurn) return;
 
         if (NetworkManager.Singleton.IsHost)
         {

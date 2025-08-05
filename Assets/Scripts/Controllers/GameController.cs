@@ -120,14 +120,10 @@ namespace Controller
 
                     if (!duelResult.AttackerWon)
                     {
-                        // Attacker died, defender survives – turn ends here
-                        captureManager.CapturePiece(pieces, piece, target);   // defender levels up
+                        // Attacker died, defender survives and levels up – turn ends here
+                        captureManager.CapturePiece(pieces, piece, target);
 
-                        turnMgr.ToggleTurn();
-                        queensCurse.TickTurn();
-
-                        foreach (var stunnedPiece in pieces)
-                            stunnedPiece.TickStunnedTurns();
+                        AdvanceTurn();
 
                         if (IsGameOver(piece))
                         {
@@ -206,11 +202,7 @@ namespace Controller
 
             sacredRoad.ProcessMove(piece);
 
-            turnMgr.ToggleTurn();          // flip side & clear old en‑passant square
-            queensCurse.TickTurn();
-
-            foreach (var stunnedPiece in pieces)
-                stunnedPiece.TickStunnedTurns();
+            AdvanceTurn();
 
             if (IsGameOver(piece))
             {
@@ -220,6 +212,15 @@ namespace Controller
 
             return true;
         }
+
+        void AdvanceTurn()
+        {
+            turnMgr.ToggleTurn();
+            TurnSync.Instance?.CommitTurn(turnMgr.WhiteTurn);
+            queensCurse.TickTurn();
+            foreach (var p in pieces) p.TickStunnedTurns();
+        }
+
 
         /// <summary>
         /// Relocates a piece instantly if destination is empty (used for King ultimate).

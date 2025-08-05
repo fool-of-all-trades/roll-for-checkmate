@@ -51,10 +51,15 @@ public class NetworkPiece : NetworkBehaviour
         // only clients need to listen for host updates
         if (!IsServer)
         {
+            // add ourselves to the client's ChessBoard.pieces list
+            var board = FindObjectOfType<ChessBoard>();
+            board.pieces.Add(piece);
+
+            // subscribe to position updates
             Row.OnValueChanged += OnCoordsChanged;
             Col.OnValueChanged += OnCoordsChanged;
 
-            // make sure we start at the correct square
+            // position us correctly
             piece.SetViewPosition(Row.Value, Col.Value);
         }
     }
