@@ -7,6 +7,10 @@ using System;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
 using System.Linq;
+using Unity.Netcode;
+using System.Collections;
+using Unity.Netcode;
+
 
 /// <summary>
 /// Renders the board, spawns pieces, handles input, and updates UI.
@@ -62,10 +66,25 @@ public class ChessBoard : MonoBehaviour
 
     private void Start()
     {
-        AddPieces();
-        controller.Initialize(pieces);
         ultimateButton.onClick.AddListener(OnUltimateButtonClicked);
         ultimateButton.gameObject.SetActive(false);
+
+        if (NetworkManager.Singleton.IsHost)
+        {
+            AddPieces();
+            controller.Initialize(pieces);   // white = host
+        }
+        else
+        {
+            StartCoroutine(WaitForBoard());
+        }
+    }
+
+    private IEnumerator WaitForBoard()
+    {
+        // Wait until the server has spawned everything
+        while (pieces.Count < 32) yield return null;
+        controller.Initialize(pieces);       // black = client
     }
 
     private void OnDestroy()
@@ -146,12 +165,24 @@ public class ChessBoard : MonoBehaviour
     /// </summary>
     private void SpawnPiece(GameObject prefab, int row, int col, bool team)
     {
+        // Only the host will create & spawn networked objects
+        if (!NetworkManager.Singleton.IsServer) return;
+
         Vector3 worldPos = GridToWorld(row, col);
 
         var go = Instantiate(prefab, worldPos, Quaternion.identity, boardTilemap.transform);
 
+        // Local init (row/col, sprite, etc.)
         var piece = go.GetComponent<Piece>();
         piece.Init(this, row, col, team);
+
+        // Network init
+        var netPiece = go.GetComponent<NetworkPiece>();
+        netPiece.InitNetwork(team);
+
+        var netObj = go.GetComponent<NetworkObject>();
+        netObj.Spawn(true); // host-owned; replicates to all clients
+
         pieces.Add(piece);
     }
     #endregion
@@ -204,8 +235,9 @@ public class ChessBoard : MonoBehaviour
     private void SelectPiece(int row, int col)
     {
         var p = GetPieceAt(row, col);
-        if (p != null && p.Team == controller.IsWhiteTurn)
 
+        bool iAmWhite = NetworkManager.Singleton.LocalClientId == 0;
+        if (p != null && p.Team == iAmWhite)
             selectedPiece = p;
 
         infoPiece = p;

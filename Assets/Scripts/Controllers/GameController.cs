@@ -3,11 +3,12 @@ using UnityEngine;
 using Pieces;
 using System.Linq;
 using System;
+using Unity.Netcode;
 
 namespace Controller
 {
     [DisallowMultipleComponent]
-    public class GameControllerMono : MonoBehaviour, IGameController
+    public class GameControllerMono : NetworkBehaviour, IGameController
     {
         List<Piece> pieces;
 
@@ -52,6 +53,10 @@ namespace Controller
         [SerializeField] private MonoBehaviour resurrectionRoot;
         IResurrectionService resurrector;
 
+
+        private Dictionary<ulong, bool> _clientTeams = new Dictionary<ulong, bool>();
+        public static GameControllerMono Instance { get; private set; }
+
         void Awake()
         {
             checker = new Checker(PieceAt);
@@ -66,6 +71,25 @@ namespace Controller
 
             resurrector = (ResurrectionService)resurrectionRoot;
             resurrector.Init(PieceAt, AddPieceToBoard, captureManager);
+
+
+            if (Instance != null && Instance != this)
+                Destroy(gameObject);
+            else
+                Instance = this;
+
+            // Listen for new connections/disconnects
+            //NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+            //NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+        }
+
+        private void OnDestroy()
+        {
+            //if (NetworkManager.Singleton != null)
+            //{
+            //    NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+            //    NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+            //}
         }
 
         /// <summary>
@@ -297,6 +321,40 @@ namespace Controller
             if (captured is Queen)
                 queensCurse.ApplyCurse(winner, 6);  // 6 half-moves = 3 full turns
         }
+
+
+        #region Network
+        //private void OnClientConnected(ulong clientId)
+        //{
+        //    // First player to join is White, second is Black
+        //    bool isWhite = (_clientTeams.Count == 0);
+        //    _clientTeams[clientId] = isWhite;
+        //    Debug.Log($"Client {clientId} joined as {(isWhite ? "White" : "Black")}");
+
+
+        //    //Debug.Log($"LocalPlayer.IsWhite: {LocalPlayer.IsWhite}");
+
+        //}
+
+        //private void OnClientDisconnected(ulong clientId)
+        //{
+        //    if (_clientTeams.Remove(clientId))
+        //        Debug.Log($"Client {clientId} disconnected and team slot freed");
+        //}
+
+        ///// <summary>
+        ///// Returns true if the given clientId is assigned to White, false for Black.
+        ///// If the clientId isn’t found, defaults to Black.
+        ///// </summary>
+        //public bool GetTeamForClient(ulong clientId)
+        //{
+        //    if (_clientTeams.TryGetValue(clientId, out bool isWhite))
+        //        return isWhite;
+
+        //    // fallback for unexpected client
+        //    return false;
+        //}
+        #endregion
 
     }
 }

@@ -12,6 +12,8 @@ GameObject:
   - component: {fileID: 1005927113765805389}
   - component: {fileID: 5858010164758450661}
   - component: {fileID: -7267356036400157677}
+  - component: {fileID: -3075735901013711383}
+  - component: {fileID: -862530162521915859}
   m_Layer: 0
   m_Name: Queen_Prefab
   m_TagString: Piece
@@ -147,3 +149,38 @@ MonoBehaviour:
   blackSprite: {fileID: -36234530, guid: 353acc1bebf456840929246ce0618c54, type: 3}
   spriteRenderer: {fileID: 1005927113765805389}
   board: {fileID: 0}
+--- !u!114 &-3075735901013711383
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3846752607250593247}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 436885913
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 1
+  AutoObjectParentSync: 1
+--- !u!114 &-862530162521915859
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3846752607250593247}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3186814c5b2620459e8b722b5c3f500, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Position:
+    m_InternalValue: {x: 0, y: 0}

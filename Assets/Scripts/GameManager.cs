@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -20,6 +18,26 @@ public class GameManager : MonoBehaviour
         // so that the GameManager persists across scene loads
         DontDestroyOnLoad(gameObject);
     }
+
+    //public enum PlayerType
+    //{
+    //    White, Black, None
+    //}
+
+    //private PlayerType _currentPlayer = PlayerType.White;
+
+    //public override void OnNetworkSpawn()
+    //{
+    //    //base.OnNetworkSpawn();
+    //    if(NetworkManager.Singleton.LocalClientId == 0)
+    //    {
+    //        _currentPlayer = PlayerType.White;
+    //    }
+    //    else
+    //    {
+    //        _currentPlayer = PlayerType.Black;
+    //    }
+    //}
 
     private void Start()
     {
