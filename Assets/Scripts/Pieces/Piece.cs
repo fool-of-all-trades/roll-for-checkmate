@@ -79,6 +79,10 @@ namespace Pieces
             //if it did update the transform.position then the Piece would teleport twice
             row = r;
             col = c;
+
+            var np = GetComponent<NetworkPiece>();
+            if (np != null && np.IsServer)
+                np.CommitGridPos(r, c);      // replicates to everyone so that the client can see host's moves
         }
 
         public void ChangeTeam(bool newTeam)

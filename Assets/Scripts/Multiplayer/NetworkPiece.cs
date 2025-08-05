@@ -1,6 +1,7 @@
 ﻿using Unity.Netcode;
 using Pieces;
 using UnityEngine;
+using static UnityEngine.Rendering.DebugUI.Table;
 
 /// <summary>
 /// Bridges the data already stored in Piece to Netcode.
@@ -15,13 +16,57 @@ public class NetworkPiece : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    public NetworkVariable<int> Row = new NetworkVariable<int>(
+        -1,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public NetworkVariable<int> Col = new NetworkVariable<int>(
+        -1,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     Piece piece;
 
     void Awake() => piece = GetComponent<Piece>();
 
+    void OnDestroy()
+    {
+        // tidy up subscriptions when the object despawns
+        if (!IsServer)
+        {
+            Row.OnValueChanged -= OnCoordsChanged;
+            Col.OnValueChanged -= OnCoordsChanged;
+        }
+    }
+
     public override void OnNetworkSpawn()
     {
+        // runs on *all* peers
         piece.ChangeTeam(Team.Value);
+
+        if (piece.board == null)
+            piece.board = FindObjectOfType<ChessBoard>();
+
+        // only clients need to listen for host updates
+        if (!IsServer)
+        {
+            Row.OnValueChanged += OnCoordsChanged;
+            Col.OnValueChanged += OnCoordsChanged;
+
+            // make sure we start at the correct square
+            piece.SetViewPosition(Row.Value, Col.Value);
+        }
+    }
+
+    // host calls this after a legal move
+    public void CommitGridPos(int r, int c)
+    {
+        Row.Value = r;
+        Col.Value = c;
+
+        // host sees movement locally right away
+        piece.SetViewPosition(r, c);
     }
 
     /// <summary>
@@ -33,4 +78,11 @@ public class NetworkPiece : NetworkBehaviour
         Team.Value = team;
         piece.ChangeTeam(team);
     }
+
+    // fired on *clients* whenever either Row or Col changes
+    void OnCoordsChanged(int _, int __)
+    {
+        piece.SetViewPosition(Row.Value, Col.Value);
+    }
+
 }

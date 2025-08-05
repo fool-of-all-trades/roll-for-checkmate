@@ -78,6 +78,8 @@ public class ChessBoard : MonoBehaviour
         {
             StartCoroutine(WaitForBoard());
         }
+
+        Debug.Log(NetworkManager.Singleton.IsHost ? "I am White" : "I am Black");
     }
 
     private IEnumerator WaitForBoard()
@@ -179,6 +181,7 @@ public class ChessBoard : MonoBehaviour
         // Network init
         var netPiece = go.GetComponent<NetworkPiece>();
         netPiece.InitNetwork(team);
+        netPiece.CommitGridPos(row, col);
 
         var netObj = go.GetComponent<NetworkObject>();
         netObj.Spawn(true); // host-owned; replicates to all clients
@@ -236,9 +239,14 @@ public class ChessBoard : MonoBehaviour
     {
         var p = GetPieceAt(row, col);
 
-        bool iAmWhite = NetworkManager.Singleton.LocalClientId == 0;
-        if (p != null && p.Team == iAmWhite)
+        bool myTeamIsWhite = NetworkManager.Singleton.IsHost;
+
+        if (p != null &&
+            p.Team == myTeamIsWhite &&      // must be my team colour
+            p.Team == controller.IsWhiteTurn)   // and my turn
+        {
             selectedPiece = p;
+        }
 
         infoPiece = p;
     }
@@ -250,8 +258,17 @@ public class ChessBoard : MonoBehaviour
     {
         if (selectedPiece == null) return;
 
-        // The controller decides legality, capture, duels, en‑passant, castling, promotion...
-        controller.TryMove(selectedPiece, destRow, destCol);
+        if (NetworkManager.Singleton.IsHost)
+        {
+            // The controller decides legality, capture, duels, en‑passant, castling, promotion...
+            // Host executes directly
+            controller.TryMove(selectedPiece, destRow, destCol);
+        }
+        else
+        {
+            // client asks politely => host validates and broadcasts
+            GetComponent<MoveRelay>().SendMove(selectedPiece, destRow, destCol);
+        }
 
         selectedPiece = null;
         infoPiece = null;
