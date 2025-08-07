@@ -30,7 +30,7 @@ public class NetworkPiece : NetworkBehaviour
 
     void Awake() => piece = GetComponent<Piece>();
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
         // tidy up subscriptions when the object despawns
         if (!IsServer)

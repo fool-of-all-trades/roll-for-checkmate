@@ -185,6 +185,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Team:
     m_InternalValue: 0
+  Row:
+    m_InternalValue: -1
+  Col:
+    m_InternalValue: -1
 --- !u!114 &-1919826234186381346
 MonoBehaviour:
   m_ObjectHideFlags: 0

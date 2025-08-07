@@ -9,20 +9,25 @@ using UnityEngine;
 public class TurnSync : NetworkBehaviour
 {
     public static TurnSync Instance { get; private set; }
+    public NetworkVariable<bool> WhiteTurn = new NetworkVariable<bool>();
 
-    /// <summary>true = white to move, false = black to move</summary>
-    public NetworkVariable<bool> WhiteTurn =
-        new NetworkVariable<bool>(true,
-                                  NetworkVariableReadPermission.Everyone,
-                                  NetworkVariableWritePermission.Server);
+    public static bool IsWhiteTurn => Instance != null && Instance.WhiteTurn.Value;
+
 
     void Awake() => Instance = this;      // quick singleton accessor
 
-    /* Host calls this immediately after toggling its local TurnManager */
-    public void CommitTurn(bool whiteToMove)
+    public override void OnNetworkSpawn()
     {
-        WhiteTurn.Value = whiteToMove;    // replicates to all clients
+        // only the server/host ever drives the turn state
+        if (IsServer)
+        {
+            WhiteTurn.Value = true; // start as White’s turn
+        }
     }
 
-    public static bool IsWhiteTurn => Instance != null && Instance.WhiteTurn.Value;
+    /* Host calls this immediately after toggling its local TurnManager */
+    public void CommitTurn(bool isWhiteTurn)
+    {
+        WhiteTurn.Value = isWhiteTurn;    // replicates to all clients
+    }
 }

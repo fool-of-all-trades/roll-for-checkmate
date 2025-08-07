@@ -9,13 +9,12 @@ using UnityEngine.EventSystems;
 using System.Linq;
 using Unity.Netcode;
 using System.Collections;
-using Unity.Netcode;
 
 
 /// <summary>
 /// Renders the board, spawns pieces, handles input, and updates UI.
 /// </summary>
-public class ChessBoard : MonoBehaviour
+public class ChessBoard : NetworkBehaviour
 {
     [Header("Grid Settings")]
     public int tileSize = 1;
@@ -52,6 +51,8 @@ public class ChessBoard : MonoBehaviour
     [SerializeField] private MonoBehaviour controllerRoot; 
     private IGameController controller;
 
+    private MoveRelay _moveRelay;
+
     #region Unity Lifecycle
 
     private void Awake()
@@ -62,6 +63,9 @@ public class ChessBoard : MonoBehaviour
         controller.OnMoveAccepted += ApplyMoveVisuals;
         controller.OnDuelRolled += ShowRoll;
         controller.OnRoadsChanged += ShowRoads;
+
+        //if (_moveRelay == null)
+        //    Debug.LogError("ChessBoard: _moveRelay is null!");
     }
 
     private void Start()
@@ -121,6 +125,8 @@ public class ChessBoard : MonoBehaviour
             UpdateUI();
         }
     }
+
+
     #endregion
 
     #region Board Initialization
@@ -182,11 +188,16 @@ public class ChessBoard : MonoBehaviour
 
         // Network init
         var netPiece = go.GetComponent<NetworkPiece>();
-        netPiece.InitNetwork(team);
-        netPiece.CommitGridPos(row, col);
+        //netPiece.InitNetwork(team);
+        //netPiece.CommitGridPos(row, col);
+
+        //var netObj = go.GetComponent<NetworkObject>();
+        //netObj.Spawn(true); // host-owned; replicates to all clients
 
         var netObj = go.GetComponent<NetworkObject>();
-        netObj.Spawn(true); // host-owned; replicates to all clients
+        netObj.Spawn(true);                   // now IsSpawned == true
+        netPiece.InitNetwork(team);           // safe to write Team.Value here
+        netPiece.CommitGridPos(row, col);     // safe to write Row/Col.Value here
 
         pieces.Add(piece);
     }
@@ -271,8 +282,18 @@ public class ChessBoard : MonoBehaviour
         }
         else
         {
-            // client asks politely => host validates and broadcasts
-            GetComponent<MoveRelay>().SendMove(selectedPiece, destRow, destCol);
+            //client asks politely => host validates and broadcasts
+            //but so far the host ignores me hard
+            if (_moveRelay == null)
+            {
+                _moveRelay = FindObjectOfType<MoveRelay>();
+                if (_moveRelay == null)
+                {
+                    Debug.LogError("[ChessBoard] No MoveRelay found!!!");
+                }
+            }
+            _moveRelay.SendMove(selectedPiece, destRow, destCol);
+            //GetComponent<MoveRelay>().SendMove(selectedPiece, destRow, destCol);
         }
 
         selectedPiece = null;
@@ -421,6 +442,11 @@ public class ChessBoard : MonoBehaviour
                 onChosen?.Invoke(null);          // signal cancel
             }
         };
+    }
+
+    public void SetMoveRelay(MoveRelay relay)
+    {
+        _moveRelay = relay;
     }
 
 }

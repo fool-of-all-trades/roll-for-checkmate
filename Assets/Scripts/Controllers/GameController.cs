@@ -78,19 +78,23 @@ namespace Controller
             else
                 Instance = this;
 
+            TurnSync.Instance.WhiteTurn.OnValueChanged += (oldVal, newVal) =>
+    Debug.Log($"[Client] Turn changed: WhiteTurn = {newVal}");
+
+
             // Listen for new connections/disconnects
             //NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
             //NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
         }
 
-        private void OnDestroy()
-        {
-            //if (NetworkManager.Singleton != null)
-            //{
-            //    NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
-            //    NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
-            //}
-        }
+        //private void OnDestroy()
+        //{
+        //    //if (NetworkManager.Singleton != null)
+        //    //{
+        //    //    NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+        //    //    NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+        //    //}
+        //}
 
         /// <summary>
         /// Attempts to move a piece. Handles captures, duels, special rules, and events.
