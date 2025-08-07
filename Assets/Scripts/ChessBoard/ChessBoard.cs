@@ -360,7 +360,7 @@ public class ChessBoard : NetworkBehaviour
 
     #region Event Methods
     // Event methods are called automatically when the given event raises
-    private void ApplyMoveVisuals(MoveResult m)
+    public void ApplyMoveVisuals(MoveResult m)
     {
         if (m.FromRow < 0)
         {
