@@ -15,12 +15,12 @@ public class MoveRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void RequestMoveServerRpc(ulong pieceId, int toRow, int toCol)
     {
-        Debug.Log($"This is a RequestMoveServerRpc function, we got to the first line");
+        //Debug.Log($"This is a RequestMoveServerRpc function, we got to the first line");
 
         if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(pieceId, out var netObj))
             return;
 
-        Debug.Log($"This is a RequestMoveServerRpc function, we got to the line after the first if check. Hopefully");
+        //Debug.Log($"This is a RequestMoveServerRpc function, we got to the line after the first if check. Hopefully");
 
         var piece = netObj.GetComponent<Piece>();
         if (piece == null)
@@ -84,7 +84,6 @@ public class MoveRelay : NetworkBehaviour
     /*               helper called by ChessBoard.AttemptMove              */
     /* ------------------------------------------------------------------ */
 
-
     private bool _ready;
 
     public override void OnNetworkSpawn()
@@ -93,11 +92,18 @@ public class MoveRelay : NetworkBehaviour
         _ready = true;
         Debug.Log($"[MoveRelay] Ready on {(IsServer ? "Server" : "Client")} ID={NetworkObjectId}");
 
-        if (!IsServer) return;
+        if (IsServer)
+        {
+            _controller = FindObjectOfType<GameControllerMono>();
+            _controller.OnMoveAccepted += OnMoveAccepted;
+        }
 
-        // find your controller (that raises OnMoveAccepted)
-        _controller = FindObjectOfType<GameControllerMono>();
-        _controller.OnMoveAccepted += OnMoveAccepted;
+        // Important: only the owning client should hook its board to THIS relay
+        if (IsOwner && IsClient)
+        {
+            var board = FindObjectOfType<ChessBoard>();
+            if (board != null) board.SetMoveRelay(this);
+        }
     }
 
     private void OnMoveAccepted(MoveResult m)

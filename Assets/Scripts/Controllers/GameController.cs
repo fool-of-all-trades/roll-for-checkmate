@@ -327,39 +327,5 @@ namespace Controller
                 queensCurse.ApplyCurse(winner, 6);  // 6 half-moves = 3 full turns
         }
 
-
-        #region Network
-        //private void OnClientConnected(ulong clientId)
-        //{
-        //    // First player to join is White, second is Black
-        //    bool isWhite = (_clientTeams.Count == 0);
-        //    _clientTeams[clientId] = isWhite;
-        //    Debug.Log($"Client {clientId} joined as {(isWhite ? "White" : "Black")}");
-
-
-        //    //Debug.Log($"LocalPlayer.IsWhite: {LocalPlayer.IsWhite}");
-
-        //}
-
-        //private void OnClientDisconnected(ulong clientId)
-        //{
-        //    if (_clientTeams.Remove(clientId))
-        //        Debug.Log($"Client {clientId} disconnected and team slot freed");
-        //}
-
-        ///// <summary>
-        ///// Returns true if the given clientId is assigned to White, false for Black.
-        ///// If the clientId isn’t found, defaults to Black.
-        ///// </summary>
-        //public bool GetTeamForClient(ulong clientId)
-        //{
-        //    if (_clientTeams.TryGetValue(clientId, out bool isWhite))
-        //        return isWhite;
-
-        //    // fallback for unexpected client
-        //    return false;
-        //}
-        #endregion
-
     }
 }

@@ -3,18 +3,43 @@ using Unity.Netcode;
 
 public class ConnectionDebugger : MonoBehaviour
 {
-    void Start()
+    private bool _wired;
+
+    private void OnEnable() { Wire(); }
+    private void OnDisable() { Unwire(); }
+    private void OnDestroy() { Unwire(); }
+
+    private void Wire()
     {
+        if (_wired) return;
         var nm = NetworkManager.Singleton;
-        if (nm == null) return;
+        if (!nm) return;
 
-        nm.OnServerStarted += () =>
-            Debug.Log("[ConnDbg] ServerStarted");
-
-        nm.OnClientConnectedCallback += id =>
-                Debug.Log($"[{(nm.IsServer ? "Host" : "Client")}] OnClientConnectedCallback → client {id}  (IsServer={nm.IsServer}, IsClient={nm.IsClient}, IsHost={nm.IsHost})");
-
-        nm.OnClientDisconnectCallback += id =>
-            Debug.Log($"[{(nm.IsServer ? "Host" : "Client")}] OnClientDisconnectCallback → client {id}");
+        nm.OnServerStarted += OnServerStarted;
+        nm.OnClientConnectedCallback += OnClientConnected;
+        nm.OnClientDisconnectCallback += OnClientDisconnected;
+        _wired = true;
     }
+
+    private void Unwire()
+    {
+        if (!_wired) return;
+        var nm = NetworkManager.Singleton;
+        if (!nm) { _wired = false; return; }
+
+        nm.OnServerStarted -= OnServerStarted;
+        nm.OnClientConnectedCallback -= OnClientConnected;
+        nm.OnClientDisconnectCallback -= OnClientDisconnected;
+        _wired = false;
+    }
+
+    private void OnServerStarted()
+        => Debug.Log("[ConnDbg] ServerStarted");
+
+    private void OnClientConnected(ulong id)
+        => Debug.Log($"[{(NetworkManager.Singleton.IsServer ? "Host" : "Client")}] OnClientConnectedCallback → client {id}  (IsServer={NetworkManager.Singleton.IsServer}, IsClient={NetworkManager.Singleton.IsClient}, IsHost={NetworkManager.Singleton.IsHost})");
+
+    private void OnClientDisconnected(ulong id)
+        => Debug.Log($"[{(NetworkManager.Singleton.IsServer ? "Host" : "Client")}] OnClientDisconnectCallback → client {id}");
+
 }

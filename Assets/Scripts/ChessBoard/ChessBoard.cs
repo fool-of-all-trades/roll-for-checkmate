@@ -68,32 +68,125 @@ public class ChessBoard : NetworkBehaviour
         //    Debug.LogError("ChessBoard: _moveRelay is null!");
     }
 
-    private void Start()
+    // --- add at top of class ---
+    private bool _wired;
+    private bool _spawnedThisRun;
+
+    // --- add (or keep) these safely ---
+    private void OnEnable()
     {
+        // you can also leave this empty; we'll rely on OnNetworkSpawn/Despawn instead
+    }
+    private void OnDisable() { }
+
+    // --- NEW: network lifecycle handlers ---
+    public override void OnNetworkSpawn()
+    {
+        // Server/Host: (re)spawn board every time networking starts
+        if (IsServer && !_spawnedThisRun)
+        {
+            // (Optional) if anything somehow survived, nuke it
+            CleanupLocalPieces();
+
+            AddPieces();
+            controller.Initialize(pieces);
+            _spawnedThisRun = true;
+            _ready = true;
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        // Reset per-session flags so next StartHost works
+        _spawnedThisRun = false;
+        _ready = false;
+
+        // local list points to destroyed objects after shutdown; clear it
+        pieces.Clear();
+        selectedPiece = null;
+        infoPiece = null;
+    }
+
+    // Helper to be extra safe if you want to hard-reset visuals on new sessions
+    private void CleanupLocalPieces()
+    {
+        var existing = FindObjectsOfType<Piece>();
+        foreach (var p in existing)
+        {
+            if (p && p.TryGetComponent<NetworkObject>(out var no))
+            {
+                if (no.IsSpawned) no.Despawn(true);
+                else Destroy(no.gameObject);
+            }
+            else if (p) // non-network piece (shouldn’t happen, but safe)
+            {
+                Destroy(p.gameObject);
+            }
+        }
+        pieces.Clear();
+    }
+
+    private bool _ready;
+
+    private IEnumerator Start()
+    {
+        // UI wiring stays
         ultimateButton.onClick.AddListener(OnUltimateButtonClicked);
         ultimateButton.gameObject.SetActive(false);
 
-        if (NetworkManager.Singleton.IsHost)
+        // wait until networking actually started
+        yield return new WaitUntil(() =>
+            NetworkManager.Singleton != null &&
+            (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient));
+
+        // wait until PlayerTeams exists & is spawned
+        yield return new WaitUntil(() =>
+            PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned);
+
+        // NEW: wait until we actually have a seat (clients only)
+        if (!NetworkManager.Singleton.IsServer)
         {
-            AddPieces();
-            controller.Initialize(pieces);   // white = host
-        }
-        else
-        {
-            StartCoroutine(WaitForBoard());
+            yield return new WaitUntil(() => PlayerTeams.MyTeam != TeamSide.None);
         }
 
-        Debug.Log(NetworkManager.Singleton.IsHost ? "I am White" : "I am Black");
+        // small sync frame
+        yield return null;
+
+        var myTeam = NetworkManager.Singleton.IsServer ? TeamSide.White : PlayerTeams.MyTeam;
+        Debug.Log($"I am {myTeam}");
+
+        if (NetworkManager.Singleton.IsServer)
+        {
+            //AddPieces();
+            //controller.Initialize(pieces);
+            //_ready = true;
+            yield break;
+        }
+
+        // client path
+        yield return StartCoroutine(WaitForBoardClient());
+        controller.Initialize(pieces);
+        _ready = true;
     }
 
-    private IEnumerator WaitForBoard()
+    private IEnumerator WaitForBoardClient()
     {
-        // Wait until the server has spawned everything
-        while (pieces.Count < 32) yield return null;
+        // wait until at least one piece exists
+        yield return new WaitUntil(() => FindObjectsOfType<Piece>().Length > 0);
+
+        // wait until the count stabilizes for a few frames
+        int lastCount = -1, stableFrames = 0;
+        while (stableFrames < 3)
+        {
+            var current = FindObjectsOfType<Piece>();
+            if (current.Length == lastCount) stableFrames++;
+            else { stableFrames = 0; lastCount = current.Length; }
+            yield return null;
+        }
 
         pieces = new List<Piece>(FindObjectsOfType<Piece>());
-        controller.Initialize(pieces);
     }
+
 
     private void OnDestroy()
     {
@@ -105,6 +198,7 @@ public class ChessBoard : NetworkBehaviour
             controller.OnRoadsChanged -= ShowRoads;
         }
     }
+
 
     /// <summary>
     /// Detects clicks outside UI and routes to selection or move logic.
