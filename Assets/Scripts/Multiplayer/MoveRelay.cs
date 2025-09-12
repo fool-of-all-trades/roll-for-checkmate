@@ -1,4 +1,4 @@
-using Controller;
+﻿using Controller;
 using Pieces;
 using Unity.Netcode;
 using UnityEngine;
@@ -13,37 +13,45 @@ public class MoveRelay : NetworkBehaviour
 
     // Client -> Host 
     [ServerRpc(RequireOwnership = false)]
-    public void RequestMoveServerRpc(ulong pieceId, int toRow, int toCol)
+    public void RequestMoveServerRpc(ulong pieceId, int toRow, int toCol, ServerRpcParams rpcParams = default)
     {
-        //Debug.Log($"This is a RequestMoveServerRpc function, we got to the first line");
-
-        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(pieceId, out var netObj))
-            return;
-
-        //Debug.Log($"This is a RequestMoveServerRpc function, we got to the line after the first if check. Hopefully");
+        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
+        if (!spawns.TryGetValue(pieceId, out var netObj)) return;
 
         var piece = netObj.GetComponent<Piece>();
-        if (piece == null)
-        {
-            Debug.LogError($"Tried to send move for unspawned piece {piece.name}");
+        var np = netObj.GetComponent<NetworkPiece>();
+        if (!piece || !netObj.IsSpawned) return;
+
+        // Block captured pieces
+        if (np && np.IsCaptured.Value) return;
+
+        // Seat + turn enforcement
+        var sender = rpcParams.Receive.SenderClientId;
+        var teams = PlayerTeams.Instance;
+        if (!teams) return;
+
+        var senderTeam = PlayerTeams.GetTeam(sender);
+        if (senderTeam == TeamSide.None) return;
+
+        bool pieceIsWhite = piece.Team;
+        if ((pieceIsWhite && senderTeam != TeamSide.White) ||
+            (!pieceIsWhite && senderTeam != TeamSide.Black))
             return;
+
+        bool whiteTurn = TurnSync.Instance && TurnSync.Instance.WhiteTurn.Value;
+        if ((senderTeam == TeamSide.White) != whiteTurn) return;
+
+        // If destination contains a captured piece somehow, ignore it
+        var target = GameControllerMono.Instance?.PieceAt(toRow, toCol);
+        if (target)
+        {
+            var tnp = target.GetComponent<NetworkPiece>();
+            if (tnp && tnp.IsCaptured.Value) return;
         }
 
-        if (!netObj.IsSpawned)
-        {
-            Debug.LogError($"Tried to send move for unspawned network obj {piece.name}");
-            return;
-        }
-
-        Debug.Log($"[Server] Got RPC for piece {pieceId} -> {toRow},{toCol}");
-
-        //var gameCtrl = FindObjectOfType<GameControllerMono>();
-
-        _controller = FindObjectOfType<GameControllerMono>();
-
-        // 1) Let your controller validate & produce a MoveResult:
-        var result = _controller?.TryMove(piece, toRow, toCol);
+        GameControllerMono.Instance?.TryMove(piece, toRow, toCol);
     }
+
 
     // Host -> Client
     [ClientRpc]
@@ -134,7 +142,7 @@ public class MoveRelay : NetworkBehaviour
     {
         if (!_ready)
         {
-            Debug.LogWarning("[MoveRelay] Not spawned yet � cannot send move.");
+            Debug.LogWarning("[MoveRelay] Not spawned yet – cannot send move.");
             return;
         }
         var netObj = piece.GetComponent<NetworkObject>();

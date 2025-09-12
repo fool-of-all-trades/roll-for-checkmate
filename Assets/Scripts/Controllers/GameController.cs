@@ -127,6 +127,13 @@ namespace Controller
                         // Attacker died, defender survives and levels up – turn ends here
                         captureManager.CapturePiece(pieces, piece, target);
 
+                        // After client reconnect they won't see ghosts of captured pieces
+                        if (IsServer)
+                        {
+                            var npA = piece.GetComponent<NetworkPiece>();
+                            if (npA) npA.IsCaptured.Value = true;
+                        }
+
                         AdvanceTurn();
 
                         if (IsGameOver(piece))
@@ -143,6 +150,13 @@ namespace Controller
                 // Auto-capture or attacker won duel
                 captureManager.CapturePiece(pieces, target, piece);       // attacker levels up
                 captured = target;           // for MoveResult
+
+                // After client reconnect they won't see ghosts of captured pieces
+                if (IsServer)
+                {
+                    var npD = target.GetComponent<NetworkPiece>();
+                    if (npD) npD.IsCaptured.Value = true;
+                }
 
                 if (target is Queen)
                     queensCurse.ApplyCurse(piece, 6);
@@ -161,6 +175,13 @@ namespace Controller
                     {
                         captureManager.CapturePiece(pieces, victim, pawn);
                         captured = victim;           // include in MoveResult
+
+                        // After client reconnect they won't see ghosts of captured pieces
+                        if (IsServer)
+                        {
+                            var npV = victim.GetComponent<NetworkPiece>();
+                            if (npV) npV.IsCaptured.Value = true;
+                        }
                     }
                 }
             }

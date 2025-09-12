@@ -325,7 +325,8 @@ public class ChessBoard : NetworkBehaviour
     private void HideCapturedPiece(Piece piece)
     {
         pieces.Remove(piece);
-        piece.gameObject.SetActive(false);
+        //piece.gameObject.SetActive(false);
+        // Visuals are handled by NetworkPiece.IsCaptured -> ApplyCapturedState
     }
 
     /// <summary>
@@ -345,6 +346,15 @@ public class ChessBoard : NetworkBehaviour
     private void SelectPiece(int row, int col)
     {
         var p = GetPieceAt(row, col);
+
+        if (p == null)
+        {
+            infoPiece = null;
+            return;
+        }
+
+        var np = p.GetComponent<NetworkPiece>();
+        if (np && np.IsCaptured.Value) return;
 
         bool myTeamIsWhite = NetworkManager.Singleton.IsHost;     // host = white, client = black
         bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
