@@ -24,11 +24,14 @@ public class NetworkPiece : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    // NEW: replicated captured state (authoritative on server)
+    // replicated captured state (authoritative on server)
     public NetworkVariable<bool> IsCaptured = new(
         false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
+
+    public NetworkVariable<int> Level = new(1,
+        NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private Piece piece;
     private Collider2D _col;
@@ -69,6 +72,7 @@ public class NetworkPiece : NetworkBehaviour
         Row.OnValueChanged += OnCoordsChanged;
         Col.OnValueChanged += OnCoordsChanged;
         IsCaptured.OnValueChanged += OnCapturedChanged;
+        Level.OnValueChanged += OnLevelChanged;
 
         // apply initial states for late joiners
         piece.SetViewPosition(Row.Value, Col.Value);
@@ -79,6 +83,7 @@ public class NetworkPiece : NetworkBehaviour
     {
         Row.OnValueChanged -= OnCoordsChanged;
         Col.OnValueChanged -= OnCoordsChanged;
+        Level.OnValueChanged -= OnLevelChanged;
         IsCaptured.OnValueChanged -= OnCapturedChanged;
     }
 
@@ -103,13 +108,18 @@ public class NetworkPiece : NetworkBehaviour
         piece.SetViewPosition(Row.Value, Col.Value);
     }
 
-    // NEW: fired when IsCaptured changes
+    // fired when IsCaptured changes
     private void OnCapturedChanged(bool _, bool now)
     {
         ApplyCapturedState(now);
     }
 
-    // NEW: centralize how "captured" looks/behaves
+    private void OnLevelChanged(int prev, int now)
+    {
+        ApplyLevel(now);
+    }
+
+    // centralize how "captured" looks/behaves
     private void ApplyCapturedState(bool captured)
     {
         // disable selection/clicks
@@ -120,5 +130,17 @@ public class NetworkPiece : NetworkBehaviour
 
         // if you have any local "isSelectable"/"isAlive" flags, flip them here as well
         //piece.IsAlive = !captured; // if your Piece has such a field; otherwise ignore
+    }
+
+    private void ApplyLevel(int now)
+    {
+        // bring the local Piece model to the replicated value
+        int delta = now - piece.Level;
+        if (delta != 0)
+            piece.UpdateLevel(delta);
+
+        // refresh info panel if this piece is currently selected
+        var board = FindObjectOfType<ChessBoard>();
+        if (board != null) board.RefreshInfoIf(piece);  // add this helper below
     }
 }

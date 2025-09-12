@@ -460,6 +460,16 @@ public class ChessBoard : NetworkBehaviour
 
         ultimateButton.gameObject.SetActive(selectedPiece != null && selectedPiece.CanUseUltimate());
     }
+
+    /// <summary>
+    /// Updates the info panel, but used in NetworkPiece so that the client sees the changes too.
+    /// </summary>
+    public void RefreshInfoIf(Piece p)
+    {
+        if (infoPiece == p)
+            UpdateUI();
+    }
+
     #endregion
 
     #region Event Methods
