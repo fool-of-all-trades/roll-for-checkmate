@@ -101,7 +101,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  Test: dwa klienty w edytorze łączą się i synchronizują ruch
 ✅  Test: dwa klienty w edytorze zjadają się
 ✅  Test: dwa klienty w edytorze mogą levelować
-🔲  Test: dwa klienty w edytorze nie mają tam gdzie nie sięga słońce kostki
+✅  Test: dwa klienty w edytorze nie mają tam gdzie nie sięga słońce kostki
 🔲  Test: dwa klienty w edytorze mogą używać umiejętności
 🔲  Test: dwa klienty w edytorze widzą animacje
 🔲  Test: dwa klienty w edytorze widzą swoje pionki na dole
