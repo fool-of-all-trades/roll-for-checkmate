@@ -56,6 +56,7 @@ public class NetworkPiece : NetworkBehaviour
     {
         // runs on *all* peers
         piece.ChangeTeam(Team.Value);
+        piece.UpdateLevel(Level.Value - piece.Level);
 
         if (!piece.board)
             piece.board = FindObjectOfType<ChessBoard>();
@@ -73,6 +74,7 @@ public class NetworkPiece : NetworkBehaviour
         Col.OnValueChanged += OnCoordsChanged;
         IsCaptured.OnValueChanged += OnCapturedChanged;
         Level.OnValueChanged += OnLevelChanged;
+        Team.OnValueChanged += (_, now) => piece.ChangeTeam(now);
 
         // apply initial states for late joiners
         piece.SetViewPosition(Row.Value, Col.Value);
@@ -84,6 +86,7 @@ public class NetworkPiece : NetworkBehaviour
         Row.OnValueChanged -= OnCoordsChanged;
         Col.OnValueChanged -= OnCoordsChanged;
         Level.OnValueChanged -= OnLevelChanged;
+        Team.OnValueChanged -= (_, __) => { };
         IsCaptured.OnValueChanged -= OnCapturedChanged;
     }
 
