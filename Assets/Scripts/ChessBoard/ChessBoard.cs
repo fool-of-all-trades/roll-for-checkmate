@@ -34,12 +34,12 @@ public class ChessBoard : NetworkBehaviour
     [Header("UI Elements")]
     // public Image diceImage;
     public TMP_Text rollText;
-    public GameObject infoPanel;
     public TMP_Text infoNameText;
     public TMP_Text infoTeamText;
     public TMP_Text infoLevelText;
     public Image infoSpriteImage;
     public Button ultimateButton;
+    [SerializeField] private TMPro.TMP_Text turnLabel;
 
     private Piece selectedPiece;
     private Piece infoPiece;
@@ -149,6 +149,13 @@ public class ChessBoard : NetworkBehaviour
             yield return new WaitUntil(() => PlayerTeams.MyTeam != TeamSide.None);
         }
 
+        // after waiting for networking + PlayerTeams (and optional seat for clients)
+        yield return new WaitUntil(() => TurnSync.Instance != null);
+
+        // subscribe & set initial label
+        TurnSync.Instance.WhiteTurn.OnValueChanged += OnWhiteTurnChanged;
+        RefreshTurnLabel();
+
         // small sync frame
         yield return null;
 
@@ -196,6 +203,9 @@ public class ChessBoard : NetworkBehaviour
             controller.OnMoveAccepted -= ApplyMoveVisuals;
             controller.OnDuelRolled -= ShowRoll;
             controller.OnRoadsChanged -= ShowRoads;
+            if (TurnSync.Instance != null)
+                TurnSync.Instance.WhiteTurn.OnValueChanged -= OnWhiteTurnChanged;
+
         }
     }
 
@@ -523,14 +533,11 @@ public class ChessBoard : NetworkBehaviour
     {
         if (infoPiece != null)
         {
-            infoPanel.SetActive(true);
             infoNameText.text = infoPiece.Name;
             infoTeamText.text = infoPiece.Team ? "Team: White" : "Team: Black";
             infoLevelText.text = "Level: " + infoPiece.Level.ToString();
             infoSpriteImage.sprite = infoPiece.GetComponent<SpriteRenderer>().sprite;
         }
-        else
-            infoPanel.SetActive(false);
 
         ultimateButton.gameObject.SetActive(selectedPiece != null && selectedPiece.CanUseUltimate());
     }
@@ -543,6 +550,41 @@ public class ChessBoard : NetworkBehaviour
         if (infoPiece == p)
             UpdateUI();
     }
+
+
+    // --- Turn label wiring ---
+    private void RefreshTurnLabel()
+    {
+        if (turnLabel == null) return;
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null || TurnSync.Instance == null || PlayerTeams.Instance == null || !PlayerTeams.Instance.IsSpawned)
+        {
+            turnLabel.text = "Waiting…";
+            return;
+        }
+
+        var myTeam = PlayerTeams.GetTeam(nm.LocalClientId);
+        if (myTeam == TeamSide.None)
+        {
+            turnLabel.text = "Waiting for seat…";
+            return;
+        }
+
+        bool whiteTurn = TurnSync.Instance.WhiteTurn.Value;
+        bool myWhite = (myTeam == TeamSide.White);
+        bool myTurn = (myWhite == whiteTurn);
+
+        // Show both “who’s turn” and “can I move”
+        string who = whiteTurn ? "White" : "Black";
+        turnLabel.text = myTurn ? $"Your turn ({who})" : $"Opponent’s turn ({who})";
+    }
+
+    private void OnWhiteTurnChanged(bool _, bool __) => RefreshTurnLabel();
+
+
+
+
 
     #endregion
 

@@ -28,25 +28,13 @@ public class TurnSync : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        if (IsServer)
-        {
-            // Initialize once on server
-            WhiteTurn.Value = true; // White starts
-        }
+        if (IsServer) WhiteTurn.Value = true; // Initialize once on server
     }
 
     /// <summary>Server-only: call after a successful move to toggle/commit.</summary>
     public void CommitTurn(bool isWhiteTurn)
     {
-        if (!IsServer)
-        {
-            // Silent no-op in builds; warn in editor to catch mistakes
-#if UNITY_EDITOR
-            Debug.LogWarning("TurnSync.CommitTurn called on a client; ignored.");
-#endif
-            return;
-        }
-        WhiteTurn.Value = isWhiteTurn;    // replicates to all clients
+        if (IsServer) WhiteTurn.Value = isWhiteTurn;    // replicates to all clients
     }
 
     void OnDestroy()

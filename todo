@@ -105,7 +105,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  Test: dwa klienty w edytorze mogą dostawać bonusy do kostek
 ✅  Test: dwa klienty w edytorze mogą zostać przeklnięte przez królową
 ✅  Test: dwa klienty w edytorze mogą zostać odepchnięte przez króla
-✅  Test: dwa klienty w edytorze mogą zostać divine smitowane przez konika
+🔲  Test: dwa klienty w edytorze mogą zostać divine smitowane przez konika, i obniża im się level
 🔲  Test: dwa klienty w edytorze mogą zostać wskrzeszone przez papieża
 🔲  Test: dwa klienty w edytorze mogą zostać zestrzelone przez wieżę
 🔲  Test: dwa klienty w edytorze reagują na świętą ścieżkę bishopa
