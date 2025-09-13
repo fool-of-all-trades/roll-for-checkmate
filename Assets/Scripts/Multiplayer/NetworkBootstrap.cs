@@ -25,17 +25,6 @@ public class NetworkBootstrap : MonoBehaviour
         spawned.Spawn(true);
     }
 
-
-    // In Start(), subscribe & also handle already-started server:
-    //void Start()
-    //{
-    //    var nm = NetworkManager.Singleton;
-    //    if (nm == null) return;
-
-    //    nm.OnServerStarted += TryEnsureCoreNetworkSingletonsSpawned;
-    //    if (nm.IsServer) TryEnsureCoreNetworkSingletonsSpawned();
-    //}
-
     private bool _wired;
     void OnEnable()
     {

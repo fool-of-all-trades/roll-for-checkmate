@@ -39,7 +39,9 @@ public class ChessBoard : NetworkBehaviour
     public TMP_Text infoLevelText;
     public Image infoSpriteImage;
     public Button ultimateButton;
-    [SerializeField] private TMPro.TMP_Text turnLabel;
+    public TMP_Text infoTurnText;
+    public TMP_Text infoStunnedText;
+    public TMP_Text infoCursedText;
 
     private Piece selectedPiece;
     private Piece infoPiece;
@@ -535,7 +537,9 @@ public class ChessBoard : NetworkBehaviour
         {
             infoNameText.text = infoPiece.Name;
             infoTeamText.text = infoPiece.Team ? "Team: White" : "Team: Black";
-            infoLevelText.text = "Level: " + infoPiece.Level.ToString();
+            infoLevelText.text = "Lvl: " + infoPiece.Level.ToString();
+            infoStunnedText.text = "Stun: " + infoPiece.StunnedTurns.ToString() + " turns";
+            infoCursedText.text = "Cursed: " + infoPiece.CursedTurns.ToString() + " turns";
             infoSpriteImage.sprite = infoPiece.GetComponent<SpriteRenderer>().sprite;
         }
 
@@ -555,19 +559,19 @@ public class ChessBoard : NetworkBehaviour
     // --- Turn label wiring ---
     private void RefreshTurnLabel()
     {
-        if (turnLabel == null) return;
+        if (infoTurnText == null) return;
 
         var nm = NetworkManager.Singleton;
         if (nm == null || TurnSync.Instance == null || PlayerTeams.Instance == null || !PlayerTeams.Instance.IsSpawned)
         {
-            turnLabel.text = "Waiting…";
+            infoTurnText.text = "Waiting…";
             return;
         }
 
         var myTeam = PlayerTeams.GetTeam(nm.LocalClientId);
         if (myTeam == TeamSide.None)
         {
-            turnLabel.text = "Waiting for seat…";
+            infoTurnText.text = "Waiting for seat…";
             return;
         }
 
@@ -577,10 +581,11 @@ public class ChessBoard : NetworkBehaviour
 
         // Show both “who’s turn” and “can I move”
         string who = whiteTurn ? "White" : "Black";
-        turnLabel.text = myTurn ? $"Your turn ({who})" : $"Opponent’s turn ({who})";
+        infoTurnText.text = myTurn ? $"Your turn ({who})" : $"Opponent’s turn ({who})";
     }
 
     private void OnWhiteTurnChanged(bool _, bool __) => RefreshTurnLabel();
+
 
 
 
@@ -616,7 +621,7 @@ public class ChessBoard : NetworkBehaviour
         UpdateUI();
     }
 
-    private void ShowRoll(int value)
+    public void ShowRoll(int value)
     {
         rollText.text = $"Rolled: {value}";
     }

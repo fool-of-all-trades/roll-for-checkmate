@@ -106,6 +106,7 @@ public class MoveRelay : NetworkBehaviour
         {
             _controller = FindObjectOfType<GameControllerMono>();
             _controller.OnMoveAccepted += OnMoveAccepted;
+            _controller.OnDuelRolled += OnDuelRolled;
         }
 
         // Important: only the owning client should hook its board to THIS relay
@@ -135,8 +136,11 @@ public class MoveRelay : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        if (IsServer && _controller != null)
+        if (IsServer && _controller != null) { 
             _controller.OnMoveAccepted -= OnMoveAccepted;
+            _controller.OnDuelRolled -= OnDuelRolled;
+        }
+
         base.OnNetworkDespawn();
     }
 
@@ -152,6 +156,26 @@ public class MoveRelay : NetworkBehaviour
 
 
         Debug.Log($"[Client] Sending move of {piece.name} -> {toRow},{toCol}");
+    }
+
+    private void OnDuelRolled(int raw)
+    {
+        // Update host UI immediately
+        var board = FindObjectOfType<ChessBoard>();
+        if (board != null) board.ShowRoll(raw);
+
+        // Tell all clients
+        ShowRollClientRpc(raw);
+    }
+
+    [ClientRpc]
+    private void ShowRollClientRpc(int raw)
+    {
+        // We already updated host locally; only remote clients need this
+        if (IsServer) return;
+
+        var board = FindObjectOfType<ChessBoard>();
+        if (board != null) board.ShowRoll(raw);
     }
 
 }

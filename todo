@@ -103,14 +103,15 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  Test: dwa klienty w edytorze mogą levelować
 ✅  Test: dwa klienty w edytorze nie mają tam gdzie nie sięga słońce kostki
 ✅  Test: dwa klienty w edytorze mogą dostawać bonusy do kostek
-✅  Test: dwa klienty w edytorze mogą zostać przeklnięte przez królową
 ✅  Test: dwa klienty w edytorze mogą zostać odepchnięte przez króla
-🔲  Test: dwa klienty w edytorze mogą zostać divine smitowane przez konika, i obniża im się level
+✅  Test: dwa klienty mogą się połączyć nie używając edytora, dodaj UI
+✅  Test: dwa klienty w edytorze widzą swoje pionki na dole
+✅  Test: dwa klienty widzą jaki był wynik rzutu kostką
+🔲  Test: dwa klienty w edytorze mogą zostać divine smitowane przez konika
 🔲  Test: dwa klienty w edytorze mogą zostać wskrzeszone przez papieża
 🔲  Test: dwa klienty w edytorze mogą zostać zestrzelone przez wieżę
 🔲  Test: dwa klienty w edytorze reagują na świętą ścieżkę bishopa
-✅  Test: dwa klienty mogą się połączyć nie używając edytora, dodaj UI
-✅  Test: dwa klienty w edytorze widzą swoje pionki na dole
+🔲  Test: dwa klienty w edytorze mogą zostać przeklnięte przez królową
 🔲  Test: dwa klienty w edytorze widzą animacje
 
 2.4  Animacje
@@ -136,7 +137,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 🔲  
 
 2.7  UI i ustawienia
-🔲  Turn Indicator – pokazuje, czy ruch ma białe, czy czarne
+✅  Turn Indicator – pokazuje, czy ruch ma białe, czy czarne
 🔲  Move Log – lista ruchów (e4, Nf6 etc.), możliwość przewinięcia
 🔲  Timer / zegar
 🔲  Game Over Screen – wynik (mat, poddanie, remis), przyciski "Restart" / "Exit to Menu"

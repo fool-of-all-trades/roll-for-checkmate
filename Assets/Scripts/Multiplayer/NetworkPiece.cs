@@ -128,8 +128,6 @@ public class NetworkPiece : NetworkBehaviour
         // hide from board by default (or route to a "graveyard" UI if you want)
         if (_sr) _sr.enabled = !captured;
 
-        // if you have any local "isSelectable"/"isAlive" flags, flip them here as well
-        //piece.IsAlive = !captured; // if your Piece has such a field; otherwise ignore
     }
 
     private void ApplyLevel(int now)
