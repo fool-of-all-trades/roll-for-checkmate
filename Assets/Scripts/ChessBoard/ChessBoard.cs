@@ -208,18 +208,23 @@ public class ChessBoard : NetworkBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-            {
                 return;
-            }
 
-            Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            int col = Mathf.FloorToInt(worldPos.x / tileSize);
-            int row = Mathf.FloorToInt(worldPos.y / tileSize);
-            HandleClick(row, col);
+            var cam = Camera.main;
+            if (!cam) return;
+
+            Vector3 worldPos = cam.ScreenToWorldPoint(Input.mousePosition);
+            Vector3Int cell = boardTilemap.WorldToCell(worldPos);
+
+            int viewRow = cell.y;
+            int viewCol = cell.x;
+
+            var (modelRow, modelCol) = ViewToModel(viewRow, viewCol);
+
+            HandleClick(modelRow, modelCol);
             UpdateUI();
         }
     }
-
 
     #endregion
 
@@ -310,13 +315,68 @@ public class ChessBoard : NetworkBehaviour
         return null;
     }
 
+    // Flip UI helpers
+    private const int BoardSize = 8;
+    //private bool IsWhitePerspective =>
+    //    NetworkManager.Singleton == null
+    //        ? true
+    //        : (NetworkManager.Singleton.IsHost            // host is white
+    //           || PlayerTeams.MyTeam == TeamSide.White);  // client white (spectator/local test)
+
+    private bool IsWhitePerspective
+    {
+        get
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null) return true;
+
+            // Host is white by design in your game
+            if (nm.IsHost) return true;
+
+            // On clients, ask PlayerTeams which side *this* local client owns
+            if (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned)
+            {
+                var myTeam = PlayerTeams.GetTeam(nm.LocalClientId);
+                return myTeam == TeamSide.White;
+            }
+
+            // If unknown momentarily, default to black so we don't mirror host
+            return false;
+        }
+    }
+
+
+    /** Convert model coords -> view coords depending on local perspective. */
+    private (int row, int col) ModelToView(int row, int col)
+    {
+        if (IsWhitePerspective) return (row, col);
+        int max = BoardSize - 1;
+        return (max - row, max - col); // 180° rotate for black
+    }
+
+    /** Convert view coords (what you clicked) -> model coords for logic. */
+    private (int row, int col) ViewToModel(int row, int col)
+    {
+        if (IsWhitePerspective) return (row, col);
+        int max = BoardSize - 1;
+        return (max - row, max - col);
+    }
+
+    // End of flip helpers
+
+
     /// <summary>
     /// Converts board coordinates to world-space position.
     /// </summary>
     public Vector3 GridToWorld(int row, int col)
     {
-        Vector3Int cellPos = new Vector3Int(col, row, 0);
+
+        var (vr, vc) = ModelToView(row, col);
+        Vector3Int cellPos = new Vector3Int(vc, vr, 0);
         return boardTilemap.GetCellCenterWorld(cellPos);
+
+        //Vector3Int cellPos = new Vector3Int(col, row, 0);
+        //return boardTilemap.GetCellCenterWorld(cellPos);
     }
 
     /// <summary>
@@ -356,7 +416,14 @@ public class ChessBoard : NetworkBehaviour
         var np = p.GetComponent<NetworkPiece>();
         if (np && np.IsCaptured.Value) return;
 
-        bool myTeamIsWhite = NetworkManager.Singleton.IsHost;     // host = white, client = black
+        var nm = NetworkManager.Singleton;
+        var myTeam = (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned)
+            ? PlayerTeams.GetTeam(nm.LocalClientId)
+            : TeamSide.Black; // safe default
+
+        bool myTeamIsWhite = (myTeam == TeamSide.White);
+
+
         bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
 
         if (p != null && p.Team == myTeamIsWhite && isMyTurn)
@@ -374,7 +441,14 @@ public class ChessBoard : NetworkBehaviour
     {
         if (selectedPiece == null) return;
 
-        bool myTeamIsWhite = NetworkManager.Singleton.IsHost;
+        var nm = NetworkManager.Singleton;
+        var myTeam = (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned)
+            ? PlayerTeams.GetTeam(nm.LocalClientId)
+            : TeamSide.Black; // safe default
+
+        bool myTeamIsWhite = (myTeam == TeamSide.White);
+
+
         bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
         if (!isMyTurn) return;
 

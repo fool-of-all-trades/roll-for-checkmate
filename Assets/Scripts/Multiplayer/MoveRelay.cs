@@ -2,6 +2,7 @@
 using Pieces;
 using Unity.Netcode;
 using UnityEngine;
+using Utils;
 
 /// <summary>
 /// Sends move requests from the local player (client) to the host.
@@ -71,6 +72,7 @@ public class MoveRelay : NetworkBehaviour
         // look up the Piece instances by NetworkObjectId
         var movingPiece = netMgr.SpawnManager.SpawnedObjects[movingPieceId]
                              .GetComponent<Piece>();
+
         Piece capturedPiece = null;
         if (capturedPieceId != 0)
             capturedPiece = netMgr.SpawnManager.SpawnedObjects[capturedPieceId]

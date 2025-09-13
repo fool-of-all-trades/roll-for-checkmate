@@ -19,26 +19,6 @@ public class GameManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    //public enum PlayerType
-    //{
-    //    White, Black, None
-    //}
-
-    //private PlayerType _currentPlayer = PlayerType.White;
-
-    //public override void OnNetworkSpawn()
-    //{
-    //    //base.OnNetworkSpawn();
-    //    if(NetworkManager.Singleton.LocalClientId == 0)
-    //    {
-    //        _currentPlayer = PlayerType.White;
-    //    }
-    //    else
-    //    {
-    //        _currentPlayer = PlayerType.Black;
-    //    }
-    //}
-
     private void Start()
     {
         // skipping TitleScene for now
