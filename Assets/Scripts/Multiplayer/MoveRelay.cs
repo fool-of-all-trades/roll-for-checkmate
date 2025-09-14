@@ -178,4 +178,38 @@ public class MoveRelay : NetworkBehaviour
         if (board != null) board.ShowRoll(raw);
     }
 
+
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestUltimateServerRpc(ulong pieceId, ServerRpcParams rpcParams = default)
+    {
+        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
+        if (!spawns.TryGetValue(pieceId, out var netObj)) return;
+
+        var piece = netObj.GetComponent<Piece>();
+        var np = netObj.GetComponent<NetworkPiece>();
+        if (!piece || !netObj.IsSpawned) return;
+
+        // Block captured pieces
+        if (np && np.IsCaptured.Value) return;
+
+        // Seat + turn enforcement (mirror RequestMoveServerRpc)
+        var sender = rpcParams.Receive.SenderClientId;
+        var teams = PlayerTeams.Instance;
+        if (!teams) return;
+
+        var senderTeam = PlayerTeams.GetTeam(sender);
+        if (senderTeam == TeamSide.None) return;
+
+        bool pieceIsWhite = piece.Team;
+        if ((pieceIsWhite && senderTeam != TeamSide.White) ||
+            (!pieceIsWhite && senderTeam != TeamSide.Black))
+            return;
+
+        bool whiteTurn = TurnSync.Instance && TurnSync.Instance.WhiteTurn.Value;
+        if ((senderTeam == TeamSide.White) != whiteTurn) return;
+
+        // Host executes the ultimate
+        piece.UseUltimateAbility(_controller);
+    }
+
 }

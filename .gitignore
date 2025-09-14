@@ -16,6 +16,11 @@ refactoring phase 1.txt
 Refactoring part 1.docx
 marketing.docx
 
+Assets/Scripts/Multiplayer/NetSyncStatus.cs
+Assets/Scripts/Multiplayer/NetSyncStatus.cs.meta
+
+
+
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
 *.blend1.meta

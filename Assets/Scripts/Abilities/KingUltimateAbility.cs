@@ -22,7 +22,7 @@ namespace Abilities
 
             if (owner.StunnedTurns > 0)
             {
-                Debug.Log("Rook is stunned and cannot use abilities.");
+                Debug.Log("King is stunned and cannot use abilities.");
                 return;
             }
 

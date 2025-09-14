@@ -108,10 +108,10 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  Test: dwa klienty w edytorze widzą swoje pionki na dole
 ✅  Test: dwa klienty widzą jaki był wynik rzutu kostką
 ✅  Test: dwa klienty w edytorze reagują na świętą ścieżkę bishopa
+✅  Test: dwa klienty w edytorze mogą zostać przeklnięte przez królową
 🔲  Test: dwa klienty w edytorze mogą zostać divine smitowane przez konika
 🔲  Test: dwa klienty w edytorze mogą zostać wskrzeszone przez papieża
 🔲  Test: dwa klienty w edytorze mogą zostać zestrzelone przez wieżę
-🔲  Test: dwa klienty w edytorze mogą zostać przeklnięte przez królową
 🔲  Test: dwa klienty w edytorze widzą animacje
 
 2.4  Animacje

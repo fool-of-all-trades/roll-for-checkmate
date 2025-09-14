@@ -513,18 +513,35 @@ public class ChessBoard : NetworkBehaviour
     }
     #endregion
 
+
     #region UI
     private void OnUltimateButtonClicked()
     {
         Debug.Log("[UI] Ultimate button clicked!");
-        if (selectedPiece != null)
+        if (selectedPiece == null)
+        {
+            Debug.Log("[UI] selectedPiece is null");
+            return;
+        }
+
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.IsServer)
         {
             Debug.Log($"[UI] selectedPiece = {selectedPiece.Name} – calling UseUltimateAbility");
             selectedPiece.UseUltimateAbility(controller);
         }
         else
         {
-            Debug.Log("[UI] selectedPiece is null");
+            // Client asks the host
+            if (_moveRelay == null) _moveRelay = FindObjectOfType<MoveRelay>();
+            if (_moveRelay == null)
+            {
+                Debug.LogError("[UI] No MoveRelay found for ultimate!");
+                return;
+            }
+
+            var netObj = selectedPiece.GetComponent<NetworkObject>();
+            _moveRelay.RequestUltimateServerRpc(netObj.NetworkObjectId);
         }
     }
 
