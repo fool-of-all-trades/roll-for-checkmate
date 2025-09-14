@@ -4,6 +4,8 @@ using Pieces;
 using System.Linq;
 using System;
 using Unity.Netcode;
+using static UnityEngine.GraphicsBuffer;
+using System.Reflection;
 
 namespace Controller
 {
@@ -142,8 +144,16 @@ namespace Controller
                 }
 
                 if (target is Queen)
+                {
                     queensCurse.ApplyCurse(piece, 6);
-            }
+
+                    if (NetworkManager.Singleton.IsServer)
+                    {
+                        var np = piece.GetComponent<NetworkPiece>();
+                        if (np) np.CursedTurns.Value = 6;
+                    }
+                }
+                }
 
 
             // ----- en‑passant capture BEFORE commit -----
@@ -328,7 +338,15 @@ namespace Controller
         {
             captureManager.CapturePiece(pieces, captured, winner);
             if (captured is Queen)
+            {
                 queensCurse.ApplyCurse(winner, 6);  // 6 half-moves = 3 full turns
+
+                if (NetworkManager.Singleton.IsServer)
+                {
+                    var np = winner.GetComponent<NetworkPiece>();
+                    if (np) np.CursedTurns.Value = 6;
+                }
+            }
         }
 
     }

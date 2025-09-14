@@ -9,6 +9,7 @@ using UnityEngine;
 [RequireComponent(typeof(NetworkObject))]
 public class NetworkPiece : NetworkBehaviour
 {
+    // Variables that need to be transmitted over the network.
     public NetworkVariable<bool> Team = new(
         default,
         NetworkVariableReadPermission.Everyone,
@@ -33,6 +34,12 @@ public class NetworkPiece : NetworkBehaviour
     public NetworkVariable<int> Level = new(1,
         NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    public NetworkVariable<int> StunnedTurns = new(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    public NetworkVariable<int> CursedTurns = new(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private Piece piece;
     private Collider2D _col;
     private SpriteRenderer _sr;
@@ -54,19 +61,26 @@ public class NetworkPiece : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        if (IsServer)
+            SeedNetworkFromPiece();
+
+
         // runs on *all* peers
         piece.ChangeTeam(Team.Value);
         piece.UpdateLevel(Level.Value - piece.Level);
 
+        piece.SetStunnedTurns(StunnedTurns.Value);
+        piece.SetCursedTurns(CursedTurns.Value);
+
         if (!piece.board)
             piece.board = FindObjectOfType<ChessBoard>();
 
-        // add ourselves to the client's ChessBoard list (you already do this on clients)
+        // add ourselves to the client's ChessBoard list ( already done this on clients)
         if (!IsServer)
         {
             var board = FindObjectOfType<ChessBoard>();
             if (board != null)
-                board.pieces.Add(piece); // your board uses this list elsewhere :contentReference[oaicite:1]{index=1}
+                board.pieces.Add(piece); //  board uses this list elsewhere
         }
 
         // subscribe to changes (both sides benefit from consistent visuals)
@@ -76,10 +90,35 @@ public class NetworkPiece : NetworkBehaviour
         Level.OnValueChanged += OnLevelChanged;
         Team.OnValueChanged += (_, now) => piece.ChangeTeam(now);
 
+        StunnedTurns.OnValueChanged += (_, now) =>
+        {
+            piece.SetStunnedTurns(now, replicate: false); // update local model only
+            piece.board.RefreshInfoIf(piece);
+        };
+
+        CursedTurns.OnValueChanged += (_, now) =>
+        {
+            piece.SetCursedTurns(now);
+            piece.board.RefreshInfoIf(piece);
+        };
+
         // apply initial states for late joiners
         piece.SetViewPosition(Row.Value, Col.Value);
         ApplyCapturedState(IsCaptured.Value);
     }
+
+    private void SeedNetworkFromPiece()
+    {
+        // push the *correct* starting values from the server’s Piece
+        Team.Value = piece.Team;
+        Level.Value = piece.Level;         // <- this prevents everything becoming 1
+        Row.Value = piece.Row;
+        Col.Value = piece.Col;
+        IsCaptured.Value = false;               // or your actual captured state
+        StunnedTurns.Value = piece.StunnedTurns;
+        CursedTurns.Value = piece.CursedTurns;
+    }
+
 
     public override void OnNetworkDespawn()
     {
@@ -88,6 +127,8 @@ public class NetworkPiece : NetworkBehaviour
         Level.OnValueChanged -= OnLevelChanged;
         Team.OnValueChanged -= (_, __) => { };
         IsCaptured.OnValueChanged -= OnCapturedChanged;
+        StunnedTurns.OnValueChanged -= (_, now) => { };
+        CursedTurns.OnValueChanged -= (_, now) => { };
     }
 
     // host calls this after a legal move

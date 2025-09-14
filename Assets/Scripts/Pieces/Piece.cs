@@ -1,5 +1,7 @@
 using UnityEngine;
 using Abilities;
+using Unity.Netcode;
+using static UnityEngine.Rendering.DebugUI;
 
 namespace Pieces
 {
@@ -100,15 +102,26 @@ namespace Pieces
         public void DecreaseCursedTurns()
         {
             if (cursedTurns > 0) cursedTurns--;
+
+            var np = GetComponent<NetworkPiece>();
+            if (np != null && np.IsServer)
+                np.CursedTurns.Value = cursedTurns;
         }
 
         public void SetCursedTurns(int t) => cursedTurns = t;
 
-        public void SetStunnedTurns(int turns) => stunnedTurns = turns;
+        public void SetStunnedTurns(int turns, bool replicate = true)
+        {
+            stunnedTurns = Mathf.Max(0, turns);
+
+            if (replicate && NetworkManager.Singleton && NetworkManager.Singleton.IsServer)
+                GetComponent<NetworkPiece>().StunnedTurns.Value = stunnedTurns;
+        }
 
         public void TickStunnedTurns() 
-        { 
-            if (stunnedTurns > 0) stunnedTurns--; 
+        {
+            if (stunnedTurns > 0)
+                SetStunnedTurns(stunnedTurns - 1);
         }
 
         public bool IsStunned() => this != null && this.StunnedTurns > 0;

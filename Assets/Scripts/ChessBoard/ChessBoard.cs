@@ -538,8 +538,9 @@ public class ChessBoard : NetworkBehaviour
             infoNameText.text = infoPiece.Name;
             infoTeamText.text = infoPiece.Team ? "Team: White" : "Team: Black";
             infoLevelText.text = "Lvl: " + infoPiece.Level.ToString();
-            infoStunnedText.text = "Stun: " + infoPiece.StunnedTurns.ToString() + " turns";
-            infoCursedText.text = "Cursed: " + infoPiece.CursedTurns.ToString() + " turns";
+            infoStunnedText.text = $"Stun: {infoPiece.StunnedTurns} turn{(infoPiece.StunnedTurns == 1 ? "" : "s")}";
+            infoCursedText.text = $"Cursed: {infoPiece.CursedTurns} turn{(infoPiece.CursedTurns == 1 ? "" : "s")}";
+
             infoSpriteImage.sprite = infoPiece.GetComponent<SpriteRenderer>().sprite;
         }
 
