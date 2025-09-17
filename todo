@@ -97,7 +97,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 
 2.3  Implementacja multiplayera
 ✅  Wybrać rozwiązanie (Photon PUN2 / Mirror + Steam P2P / UGS) -> prawdopodobnie UGS (ma do 50 concurrent players za darmo a potem pay as you go, więc jak będzie 51 to wyjdzie bardzo tanio. Natomiast PUN2 ma tylko 20 concurrent players a potem od razu 95$ na rok jak przekroczysz. Mirror+steam jest za darmo ale to nie będzie miało lobby, więc tylko znajomi i tylko na steam mogliby grać, fishnet czy coś istnieje ale do tego potrzebowałybyśmy osobnego serwera, ogółem na teraz myślę że UGS to najlepsza opcja)
-✅  Zainstalować pakiet i skonfigurować
+✅  Zainstalować transport, netcode.gameobjects
 ✅  Test: dwa klienty w edytorze łączą się i synchronizują ruch
 ✅  Test: dwa klienty w edytorze zjadają się
 ✅  Test: dwa klienty w edytorze mogą levelować
@@ -111,9 +111,10 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  Test: dwa klienty w edytorze mogą zostać przeklnięte przez królową
 ✅  Test: dwa klienty w edytorze mogą zostać wskrzeszone przez papieża
 ✅  Test: dwa klienty w edytorze mogą zostać divine smitowane przez konika
-🔲  Test: dwa klienty w edytorze mogą zostać zestrzelone przez wieżę
+✅  Test: dwa klienty w edytorze mogą zostać zestrzelone przez wieżę
+✅  Zainstalować relay, authentication, lobby
+🔲  Test: można utworzyć grę i dołączyć do niej po kodzie, logowanie anonimowe
 🔲  Test: dwa klienty w edytorze widzą animacje
-🔲  Test: można utworzyć grę i dołączyć do niej po kodzie
 
 2.4  Animacje
 🔲  Mini duszek królowej unoszący się koło przeklętego pionka?

@@ -541,7 +541,19 @@ public class ChessBoard : NetworkBehaviour
             }
 
             var netObj = selectedPiece.GetComponent<NetworkObject>();
-            _moveRelay.RequestUltimateServerRpc(netObj.NetworkObjectId);
+            //_moveRelay.RequestUltimateServerRpc(netObj.NetworkObjectId);
+
+            // If this is a rook and we’re a client, start the client-side picker flow
+            if (selectedPiece is Rook && !NetworkManager.Singleton.IsServer)
+            {
+                _moveRelay.StartRookUltimateServerRpc(netObj.NetworkObjectId);
+            }
+            else
+            {
+                // existing path, cuz for Knight, King and Bishop that one works
+                _moveRelay.RequestUltimateServerRpc(netObj.NetworkObjectId);
+            }
+
         }
     }
 
