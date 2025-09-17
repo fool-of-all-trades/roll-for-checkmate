@@ -77,6 +77,7 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Z jakiegoś powodu pionki wciąż mogą jakimś cudem mieć level 6 mimo iż 5 powiniem być max
 🔲  Naprawić że po tym jak król umiera nie ma game over (jak zestrzeli go wieżyczka XD)
 🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca, więc zeskakują z planszy i pozwalają dodać +1 level do dowolnej figury gracza)
+🔲  Umiejętność króla w sumie jest na ten moment trochę bezużyteczna z niektórymi pionkami, trzeba ją lekko zmodyfikować by odsuwać je tak by nie miały czystej drogi powrotu do króla
 🔲  2 Audio Listenery są no bo każda ze scen ma kamerę i każda z kamer listener, Unity to przeszkadza (ale jak zrobi się przechodzenie między scenami to powinno się to samo naprawić)
 
 1.9 Gra działa?
@@ -113,7 +114,7 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  Test: dwa klienty w edytorze mogą zostać divine smitowane przez konika
 ✅  Test: dwa klienty w edytorze mogą zostać zestrzelone przez wieżę
 ✅  Zainstalować relay, authentication, lobby
-🔲  Test: można utworzyć grę i dołączyć do niej po kodzie, logowanie anonimowe
+✅  Test: można utworzyć grę i dołączyć do niej po kodzie, logowanie anonimowe
 🔲  Test: dwa klienty w edytorze widzą animacje
 
 2.4  Animacje
