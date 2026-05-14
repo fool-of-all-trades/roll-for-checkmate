@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using Pieces;
@@ -310,7 +310,8 @@ public class ChessBoard : NetworkBehaviour
         netPiece.InitNetwork(team);           // safe to write Team.Value here
         netPiece.CommitGridPos(row, col);     // safe to write Row/Col.Value here
 
-        pieces.Add(piece);
+        if (!pieces.Contains(piece))
+            pieces.Add(piece);
     }
     #endregion
 
@@ -322,8 +323,18 @@ public class ChessBoard : NetworkBehaviour
     public Piece GetPieceAt(int row, int col)
     {
         foreach (var p in pieces)
+        {
+            if (p == null || !p.gameObject.activeInHierarchy)
+                continue;
+
+            var np = p.GetComponent<NetworkPiece>();
+            if (np != null && np.IsCaptured.Value)
+                continue;
+
             if (p.Row == row && p.Col == col)
                 return p;
+        }
+
         return null;
     }
 

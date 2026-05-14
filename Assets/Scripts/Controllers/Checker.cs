@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Pieces;
 using UnityEngine;
 
@@ -182,13 +182,13 @@ namespace Controller
             var oldLookup = _pieceAt;
             _pieceAt = TempLookup;
 
-            // Temporarily move the piece (so piece.Row/Col reflect the new spot for threat checks)
-            piece.SetBoardCoords(destRow, destCol);   // or SetGridPosition if that's your method name
+            // Temporarily move the piece model for threat checks without replicating or moving visuals.
+            piece.SetBoardCoordsForSimulation(destRow, destCol);
 
             bool result = IsKingInDanger();
 
-            // Revert
-            piece.SetBoardCoords(originalRow, originalCol);
+            // Revert the temporary model coordinates without replicating or moving visuals.
+            piece.SetBoardCoordsForSimulation(originalRow, originalCol);
             _pieceAt = oldLookup;
 
             return result;

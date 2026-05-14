@@ -1,4 +1,4 @@
-﻿using Unity.Netcode;
+using Unity.Netcode;
 using Pieces;
 using UnityEngine;
 
@@ -79,8 +79,8 @@ public class NetworkPiece : NetworkBehaviour
         if (!IsServer)
         {
             var board = FindObjectOfType<ChessBoard>();
-            if (board != null)
-                board.pieces.Add(piece); //  board uses this list elsewhere
+            if (board != null && !board.pieces.Contains(piece))
+                board.pieces.Add(piece); // board uses this list elsewhere
         }
 
         // subscribe to changes (both sides benefit from consistent visuals)
@@ -166,12 +166,36 @@ public class NetworkPiece : NetworkBehaviour
     // centralize how "captured" looks/behaves
     private void ApplyCapturedState(bool captured)
     {
+        SyncBoardMembership(captured);
+
         // disable selection/clicks
         if (_col) _col.enabled = !captured;
 
         // hide from board by default (or route to a "graveyard" UI if you want)
         if (_sr) _sr.enabled = !captured;
+    }
 
+    private void SyncBoardMembership(bool captured)
+    {
+        if (piece == null) return;
+
+        var board = piece.board;
+        if (board == null)
+        {
+            board = FindObjectOfType<ChessBoard>();
+            if (board != null) piece.board = board;
+        }
+
+        if (board == null) return;
+
+        if (captured)
+        {
+            board.pieces.Remove(piece);
+            return;
+        }
+
+        if (!board.pieces.Contains(piece))
+            board.pieces.Add(piece);
     }
 
     private void ApplyLevel(int now)

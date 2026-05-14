@@ -16,6 +16,7 @@ public class PlayerTeams : NetworkBehaviour
 
     private NetworkVariable<ulong>.OnValueChangedDelegate _whiteChanged;
     private NetworkVariable<ulong>.OnValueChangedDelegate _blackChanged;
+    private bool _serverCallbacksRegistered;
 
     public static event System.Action TeamsChanged;
 
@@ -34,8 +35,7 @@ public class PlayerTeams : NetworkBehaviour
             WhiteClientId.Value = NetworkManager.ServerClientId;
             Debug.Log($"[PlayerTeams] White={WhiteClientId.Value}");
 
-            NetworkManager.OnClientConnectedCallback += OnClientConnected;
-            NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
+            RegisterServerCallbacks();
         }
 
         // notify clients when seats change (can also subscribe to it in ChessBoard to show some UI change)
@@ -47,18 +47,41 @@ public class PlayerTeams : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        if (IsServer)
-        {
-            NetworkManager.OnClientConnectedCallback -= OnClientConnected;
-            NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
-        }
+        UnregisterServerCallbacks();
 
         if (_whiteChanged != null) WhiteClientId.OnValueChanged -= _whiteChanged;
         if (_blackChanged != null) BlackClientId.OnValueChanged -= _blackChanged;
     }
     void OnDestroy()
     {
+        UnregisterServerCallbacks();
         if (Instance == this) Instance = null;
+    }
+
+    private void RegisterServerCallbacks()
+    {
+        if (_serverCallbacksRegistered) return;
+
+        var nm = NetworkManager;
+        if (nm == null) return;
+
+        nm.OnClientConnectedCallback += OnClientConnected;
+        nm.OnClientDisconnectCallback += OnClientDisconnected;
+        _serverCallbacksRegistered = true;
+    }
+
+    private void UnregisterServerCallbacks()
+    {
+        if (!_serverCallbacksRegistered) return;
+
+        var nm = NetworkManager != null ? NetworkManager : NetworkManager.Singleton;
+        if (nm != null)
+        {
+            nm.OnClientConnectedCallback -= OnClientConnected;
+            nm.OnClientDisconnectCallback -= OnClientDisconnected;
+        }
+
+        _serverCallbacksRegistered = false;
     }
 
     bool IsConnected(ulong id)
@@ -91,6 +114,14 @@ public class PlayerTeams : NetworkBehaviour
 
     private void OnClientDisconnected(ulong clientId)
     {
+        var nm = NetworkManager;
+        if (!IsServer ||
+            !IsSpawned ||
+            nm == null ||
+            nm.ShutdownInProgress ||
+            !nm.IsListening)
+            return;
+
         if (clientId == BlackClientId.Value)
         {
             BlackClientId.Value = Unset;

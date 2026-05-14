@@ -60,7 +60,7 @@ namespace Pieces
         }
 
         /// <summary>
-        /// Sets row/col and the GameObject’s transform.position.
+        /// Sets row/col and the GameObject's transform.position.
         /// Used in the ChessBoard (view layer).
         /// </summary>
         /// <param name="newRow"></param>
@@ -73,7 +73,7 @@ namespace Pieces
         }
 
         /// <summary>
-        /// Sets row/col but does not touch the GameObject’s transform.position.
+        /// Sets row/col but does not touch the GameObject's transform.position.
         /// Used in the controller/services (logic layer).
         /// </summary>
         public void SetBoardCoords(int r, int c)
@@ -85,6 +85,16 @@ namespace Pieces
             var np = GetComponent<NetworkPiece>();
             if (np != null && np.IsServer)
                 np.CommitGridPos(r, c);      // replicates to everyone so that the client can see host's moves
+        }
+
+        /// <summary>
+        /// Sets row/col for temporary rule simulations only.
+        /// Does not move visuals or replicate network state.
+        /// </summary>
+        public void SetBoardCoordsForSimulation(int r, int c)
+        {
+            row = r;
+            col = c;
         }
 
         public void ChangeTeam(bool newTeam)
