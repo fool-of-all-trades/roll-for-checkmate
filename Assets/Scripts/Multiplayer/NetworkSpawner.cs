@@ -125,9 +125,6 @@ public class NetworkSpawner : MonoBehaviour
         no.SpawnWithOwnership(clientId);
         _relays[clientId] = no;
 
-        // Optional: server-side board hookup only (clients should resolve their own local relay)
-        var relay = go.GetComponent<MoveRelay>();
-        var board = FindObjectOfType<ChessBoard>();
-        if (board) board.SetMoveRelay(relay);
+        // Clients bind to their owned relay in MoveRelay.OnNetworkSpawn.
     }
 }
