@@ -282,8 +282,20 @@ public class MoveRelay : NetworkBehaviour
             return;
 
         // Build valid target list (second enemy in each rook ray)
-        var board = FindObjectOfType<ChessBoard>();
+        var ids = GetRookUltimateTargetIds(rookPiece);
+
+        // Send only to the requesting client
+        var sendParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { sender } }
+        };
+        ChooseRookUltimateTargetClientRpc(rookId, ids.ToArray(), sendParams);
+    }
+
+    private List<ulong> GetRookUltimateTargetIds(Piece rookPiece)
+    {
         var ids = new List<ulong>();
+        if (rookPiece == null || GameControllerMono.Instance == null) return ids;
 
         int r0 = rookPiece.Row, c0 = rookPiece.Col;
         var dirs = new (int dr, int dc)[] { (1, 0), (-1, 0), (0, 1), (0, -1) };
@@ -315,12 +327,7 @@ public class MoveRelay : NetworkBehaviour
             }
         }
 
-        // Send only to the requesting client
-        var sendParams = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams { TargetClientIds = new[] { sender } }
-        };
-        ChooseRookUltimateTargetClientRpc(rookId, ids.ToArray(), sendParams);
+        return ids;
     }
 
     [ClientRpc]
@@ -344,26 +351,35 @@ public class MoveRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    void SubmitRookUltimateTargetServerRpc(ulong rookId, ulong targetId, ServerRpcParams _ = default)
+    void SubmitRookUltimateTargetServerRpc(ulong rookId, ulong targetId, ServerRpcParams rpcParams = default)
     {
+        if (!TryValidatePieceCommand(rookId, rpcParams, out var rookPiece, out var senderTeam, out var reason))
+            return;
+
         if (targetId == 0) return; // canceled
 
-        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
-        if (!spawns.TryGetValue(rookId, out var rookObj)) return;
-        if (!spawns.TryGetValue(targetId, out var targetObj)) return;
+        if (!(rookPiece is Rook)) return;
+        if (!rookPiece.CanUseUltimate()) return;
+        if (rookPiece.StunnedTurns > 0) return;
 
-        var rook = rookObj.GetComponent<Piece>();
+        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
+        if (!spawns.TryGetValue(targetId, out var targetObj)) return;
+        if (!targetObj.IsSpawned) return;
+
         var target = targetObj.GetComponent<Piece>();
         var tnp = targetObj.GetComponent<NetworkPiece>();
-        if (!rook || !target || !tnp || tnp.IsCaptured.Value) return;
+        if (!target || !tnp || tnp.IsCaptured.Value) return;
+
+        var legalTargetIds = GetRookUltimateTargetIds(rookPiece);
+        if (!legalTargetIds.Contains(targetId)) return;
 
         // Apply replicated effects
         tnp.IsCaptured.Value = true;                 // hide / disable everywhere
-        GameControllerMono.Instance.CapturePiece(target, rook); // XP, curses, etc.
+        GameControllerMono.Instance.CapturePiece(target, rookPiece); // XP, curses, etc.
 
         // Make the new level visible immediately to all clients (optional but nice)
-        var rnp = rookObj.GetComponent<NetworkPiece>();
-        if (rnp != null) rnp.Level.Value = rook.Level;
+        var rnp = rookPiece.GetComponent<NetworkPiece>();
+        if (rnp != null) rnp.Level.Value = rookPiece.Level;
     }
 
 
