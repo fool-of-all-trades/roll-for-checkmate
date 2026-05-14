@@ -11,7 +11,10 @@ using Utils;
 /// </summary>
 public class MoveRelay : NetworkBehaviour
 {
+    private static MoveRelay s_broadcaster;
+
     private GameControllerMono _controller;
+    private bool _isBroadcaster;
 
     // Client -> Host 
     [ServerRpc(RequireOwnership = false)]
@@ -105,9 +108,7 @@ public class MoveRelay : NetworkBehaviour
 
         if (IsServer)
         {
-            _controller = FindObjectOfType<GameControllerMono>();
-            _controller.OnMoveAccepted += OnMoveAccepted;
-            _controller.OnDuelRolled += OnDuelRolled;
+            TryRegisterAsBroadcaster();
         }
 
         // Important: only the owning client should hook its board to THIS relay
@@ -116,6 +117,25 @@ public class MoveRelay : NetworkBehaviour
             var board = FindObjectOfType<ChessBoard>();
             if (board != null) board.SetMoveRelay(this);
         }
+    }
+
+    private void TryRegisterAsBroadcaster()
+    {
+        if (_isBroadcaster) return;
+        if (s_broadcaster != null && s_broadcaster != this) return;
+
+        _controller = FindObjectOfType<GameControllerMono>();
+        if (_controller == null)
+        {
+            Debug.LogWarning("[MoveRelay] No GameControllerMono found; cannot register broadcaster.");
+            return;
+        }
+
+        s_broadcaster = this;
+        _isBroadcaster = true;
+        _controller.OnMoveAccepted += OnMoveAccepted;
+        _controller.OnDuelRolled += OnDuelRolled;
+        Debug.Log($"[MoveRelay] Registered broadcaster ID={NetworkObjectId}");
     }
 
     private void OnMoveAccepted(MoveResult m)
@@ -137,10 +157,16 @@ public class MoveRelay : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        if (IsServer && _controller != null) { 
+        if (_isBroadcaster && _controller != null)
+        {
             _controller.OnMoveAccepted -= OnMoveAccepted;
             _controller.OnDuelRolled -= OnDuelRolled;
         }
+
+        if (s_broadcaster == this)
+            s_broadcaster = null;
+
+        _isBroadcaster = false;
 
         base.OnNetworkDespawn();
     }
