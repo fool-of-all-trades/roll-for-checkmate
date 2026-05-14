@@ -16,7 +16,7 @@ namespace Abilities
         {
             if (usedUltimate)
             {
-                Debug.Log("Król ju¿ skorzysta³ z jednorazowego pchniêcia.");
+                Debug.Log("Krï¿½l juï¿½ skorzystaï¿½ z jednorazowego pchniï¿½cia.");
                 return;
             }
 
@@ -64,7 +64,7 @@ namespace Abilities
                     }
                     else
                     {
-                        Debug.Log("Nie mo¿na wypchn¹æ: miejsce za jest zajête albo poza plansz¹, albo nie ma wrogów w s¹siedztwie.");
+                        Debug.Log("Nie moï¿½na wypchnï¿½ï¿½: miejsce za jest zajï¿½te albo poza planszï¿½, albo nie ma wrogï¿½w w sï¿½siedztwie.");
                     }
 
                     return;

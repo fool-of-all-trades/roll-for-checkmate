@@ -267,8 +267,11 @@ public class MoveRelay : NetworkBehaviour
         if (!TryValidatePieceCommand(pieceId, rpcParams, out var piece, out _, out _))
             return;
 
+        var controller = _controller != null ? _controller : GameControllerMono.Instance;
+        if (controller == null) return;
+
         // Host executes the ultimate
-        piece.UseUltimateAbility(_controller);
+        piece.UseUltimateAbility(controller);
     }
 
 
@@ -472,6 +475,7 @@ public class MoveRelay : NetworkBehaviour
         // Make the new level visible immediately to all clients (optional but nice)
         var rnp = rookPiece.GetComponent<NetworkPiece>();
         if (rnp != null) rnp.Level.Value = rookPiece.Level;
+        rookPiece.SetUltimateUsed(true);
     }
 
 
