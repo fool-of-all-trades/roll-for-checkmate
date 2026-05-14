@@ -20,31 +20,8 @@ public class MoveRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void RequestMoveServerRpc(ulong pieceId, int toRow, int toCol, ServerRpcParams rpcParams = default)
     {
-        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
-        if (!spawns.TryGetValue(pieceId, out var netObj)) return;
-
-        var piece = netObj.GetComponent<Piece>();
-        var np = netObj.GetComponent<NetworkPiece>();
-        if (!piece || !netObj.IsSpawned) return;
-
-        // Block captured pieces
-        if (np && np.IsCaptured.Value) return;
-
-        // Seat + turn enforcement
-        var sender = rpcParams.Receive.SenderClientId;
-        var teams = PlayerTeams.Instance;
-        if (!teams) return;
-
-        var senderTeam = PlayerTeams.GetTeam(sender);
-        if (senderTeam == TeamSide.None) return;
-
-        bool pieceIsWhite = piece.Team;
-        if ((pieceIsWhite && senderTeam != TeamSide.White) ||
-            (!pieceIsWhite && senderTeam != TeamSide.Black))
+        if (!TryValidatePieceCommand(pieceId, rpcParams, out var piece, out _, out _))
             return;
-
-        bool whiteTurn = TurnSync.Instance && TurnSync.Instance.WhiteTurn.Value;
-        if ((senderTeam == TeamSide.White) != whiteTurn) return;
 
         // If destination contains a captured piece somehow, ignore it
         var target = GameControllerMono.Instance?.PieceAt(toRow, toCol);
@@ -55,6 +32,84 @@ public class MoveRelay : NetworkBehaviour
         }
 
         GameControllerMono.Instance?.TryMove(piece, toRow, toCol);
+    }
+
+    private bool TryValidatePieceCommand(
+        ulong pieceId,
+        ServerRpcParams rpcParams,
+        out Piece piece,
+        out TeamSide senderTeam,
+        out string failureReason)
+    {
+        piece = null;
+        senderTeam = TeamSide.None;
+        failureReason = null;
+
+        if (!IsServer)
+        {
+            failureReason = "Not running on server.";
+            return false;
+        }
+
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager == null)
+        {
+            failureReason = "NetworkManager is missing.";
+            return false;
+        }
+
+        var teams = PlayerTeams.Instance;
+        if (!teams)
+        {
+            failureReason = "PlayerTeams is missing.";
+            return false;
+        }
+
+        var sender = rpcParams.Receive.SenderClientId;
+        senderTeam = PlayerTeams.GetTeam(sender);
+        if (senderTeam == TeamSide.None)
+        {
+            failureReason = "Sender has no team.";
+            return false;
+        }
+
+        bool whiteTurn = TurnSync.Instance && TurnSync.Instance.WhiteTurn.Value;
+        if ((senderTeam == TeamSide.White) != whiteTurn)
+        {
+            failureReason = "Not sender team's turn.";
+            return false;
+        }
+
+        var spawns = networkManager.SpawnManager.SpawnedObjects;
+        if (!spawns.TryGetValue(pieceId, out var netObj))
+        {
+            failureReason = "NetworkObject id was not found.";
+            return false;
+        }
+
+        piece = netObj.GetComponent<Piece>();
+        if (!piece || !netObj.IsSpawned)
+        {
+            failureReason = "NetworkObject has no spawned Piece.";
+            return false;
+        }
+
+        var np = netObj.GetComponent<NetworkPiece>();
+        if (np && np.IsCaptured.Value)
+        {
+            failureReason = "Piece is captured.";
+            return false;
+        }
+
+        bool pieceIsWhite = piece.Team;
+        if ((pieceIsWhite && senderTeam != TeamSide.White) ||
+            (!pieceIsWhite && senderTeam != TeamSide.Black))
+        {
+            failureReason = "Piece does not belong to sender team.";
+            return false;
+        }
+
+        return true;
     }
 
 
@@ -209,31 +264,8 @@ public class MoveRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void RequestUltimateServerRpc(ulong pieceId, ServerRpcParams rpcParams = default)
     {
-        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
-        if (!spawns.TryGetValue(pieceId, out var netObj)) return;
-
-        var piece = netObj.GetComponent<Piece>();
-        var np = netObj.GetComponent<NetworkPiece>();
-        if (!piece || !netObj.IsSpawned) return;
-
-        // Block captured pieces
-        if (np && np.IsCaptured.Value) return;
-
-        // Seat + turn enforcement (mirror RequestMoveServerRpc)
-        var sender = rpcParams.Receive.SenderClientId;
-        var teams = PlayerTeams.Instance;
-        if (!teams) return;
-
-        var senderTeam = PlayerTeams.GetTeam(sender);
-        if (senderTeam == TeamSide.None) return;
-
-        bool pieceIsWhite = piece.Team;
-        if ((pieceIsWhite && senderTeam != TeamSide.White) ||
-            (!pieceIsWhite && senderTeam != TeamSide.Black))
+        if (!TryValidatePieceCommand(pieceId, rpcParams, out var piece, out _, out _))
             return;
-
-        bool whiteTurn = TurnSync.Instance && TurnSync.Instance.WhiteTurn.Value;
-        if ((senderTeam == TeamSide.White) != whiteTurn) return;
 
         // Host executes the ultimate
         piece.UseUltimateAbility(_controller);
@@ -245,25 +277,9 @@ public class MoveRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void StartRookUltimateServerRpc(ulong rookId, ServerRpcParams rpcParams = default)
     {
-        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
-        if (!spawns.TryGetValue(rookId, out var rookObj)) return;
-
-        var rookPiece = rookObj.GetComponent<Piece>();
-        var rookNet = rookObj.GetComponent<NetworkPiece>();
-        if (!rookPiece || !rookObj.IsSpawned || (rookNet && rookNet.IsCaptured.Value)) return;
-
-        // Enforce: correct player & turn (same checks as RequestUltimateServerRpc)
         var sender = rpcParams.Receive.SenderClientId;
-        var senderTeam = PlayerTeams.GetTeam(sender);
-        if (senderTeam == TeamSide.None) return;
-
-        bool pieceIsWhite = rookPiece.Team;
-        if ((pieceIsWhite && senderTeam != TeamSide.White) ||
-            (!pieceIsWhite && senderTeam != TeamSide.Black))
+        if (!TryValidatePieceCommand(rookId, rpcParams, out var rookPiece, out _, out _))
             return;
-
-        bool whiteTurn = TurnSync.Instance && TurnSync.Instance.WhiteTurn.Value;
-        if ((senderTeam == TeamSide.White) != whiteTurn) return;
 
         // Build valid target list (second enemy in each rook ray)
         var board = FindObjectOfType<ChessBoard>();
