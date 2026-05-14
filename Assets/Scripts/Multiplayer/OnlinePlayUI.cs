@@ -15,6 +15,9 @@ public class OnlinePlayUI : MonoBehaviour
     [SerializeField] private Button startMatchBtn; // Host only: allocate Relay + start host
     [SerializeField] private Button leaveLobbyBtn;
 
+    private bool _isConnectingToRelay;
+    private bool _relayClientStartIssued;
+
     void Awake()
     {
         createLobbyBtn.onClick.AddListener(async () => await CreateLobby());
@@ -73,6 +76,9 @@ public class OnlinePlayUI : MonoBehaviour
 
     async Task LeaveLobby()
     {
+        _isConnectingToRelay = false;
+        _relayClientStartIssued = false;
+
         await LobbyManager.Instance.LeaveAsync();
         statusLabel.text = "Left lobby.";
         if (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient)
@@ -81,6 +87,15 @@ public class OnlinePlayUI : MonoBehaviour
         }
     }
 
+
+    void OnDestroy()
+    {
+        if (LobbyManager.Instance)
+            LobbyManager.Instance.OnLobbyChanged -= OnLobbyChanged;
+
+        _isConnectingToRelay = false;
+        _relayClientStartIssued = false;
+    }
     void OnLobbyChanged(Unity.Services.Lobbies.Models.Lobby lob)
     {
         if (lob == null) return;
@@ -89,16 +104,31 @@ public class OnlinePlayUI : MonoBehaviour
 
     async void TryAutoConnectIfReady()
     {
-        var code = LobbyManager.Instance.GetRelayJoinCode();
-        if (!string.IsNullOrEmpty(code) && !NetworkManager.Singleton.IsServer && !NetworkManager.Singleton.IsClient)
+        if (_isConnectingToRelay || _relayClientStartIssued) return;
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null || nm.IsServer || nm.IsClient || nm.IsListening) return;
+
+        var lobbyManager = LobbyManager.Instance;
+        if (lobbyManager == null || lobbyManager.CurrentLobby == null) return;
+
+        var code = lobbyManager.GetRelayJoinCode();
+        if (string.IsNullOrEmpty(code)) return;
+
+        _isConnectingToRelay = true;
+        statusLabel.text = "Connecting to host…";
+
+        try
         {
-            statusLabel.text = "Connecting to host…";
-            try
-            {
-                await RelayManager.JoinClientWithRelayAsync(code);
-                statusLabel.text = "Connected!";
-            }
-            catch (System.Exception e) { statusLabel.text = $"Connect failed: {e.Message}"; }
+            await RelayManager.JoinClientWithRelayAsync(code);
+            _relayClientStartIssued = true;
+            statusLabel.text = "Connected!";
+        }
+        catch (System.Exception e)
+        {
+            _isConnectingToRelay = false;
+            _relayClientStartIssued = false;
+            statusLabel.text = $"Connect failed: {e.Message}";
         }
     }
 }
