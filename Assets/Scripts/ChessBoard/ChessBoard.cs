@@ -559,6 +559,10 @@ public class ChessBoard : NetworkBehaviour
             {
                 _moveRelay.StartRookUltimateServerRpc(netObj.NetworkObjectId);
             }
+            else if (selectedPiece is Knight && !NetworkManager.Singleton.IsServer)
+            {
+                _moveRelay.StartKnightUltimateServerRpc(netObj.NetworkObjectId);
+            }
             else
             {
                 // existing path, cuz for Knight, King and Bishop that one works

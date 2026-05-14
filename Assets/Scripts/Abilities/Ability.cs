@@ -47,6 +47,13 @@ namespace Abilities
             return !usedUltimate && pieceLevel >= levelRequirement;
         }
 
+        public bool HasUsedUltimate => usedUltimate;
+
+        public void SetUltimateUsed(bool used)
+        {
+            usedUltimate = used;
+        }
+
         /// <summary>
         /// Executes the ability logic.
         /// </summary>

@@ -148,6 +148,14 @@ namespace Pieces
         public bool CanUseUltimate()
             => ultimateAbility != null && ultimateAbility.CanUseUltimate(level) && cursedTurns == 0;
 
+        public bool HasUsedUltimate()
+            => ultimateAbility != null && ultimateAbility.HasUsedUltimate;
+
+        public void SetUltimateUsed(bool used)
+        {
+            ultimateAbility?.SetUltimateUsed(used);
+        }
+
         /// <summary>
         /// Implements the specific geometrical movement rules for each piece type.
         /// No checking safety, that's the controller's job.

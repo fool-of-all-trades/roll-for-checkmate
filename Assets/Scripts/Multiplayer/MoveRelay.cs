@@ -351,6 +351,98 @@ public class MoveRelay : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
+    public void StartKnightUltimateServerRpc(ulong knightId, ServerRpcParams rpcParams = default)
+    {
+        var sender = rpcParams.Receive.SenderClientId;
+        if (!TryValidatePieceCommand(knightId, rpcParams, out var knightPiece, out _, out _))
+            return;
+
+        if (!(knightPiece is Knight)) return;
+        if (!knightPiece.CanUseUltimate()) return;
+        if (knightPiece.StunnedTurns > 0) return;
+
+        var ids = GetKnightUltimateTargetIds(knightPiece);
+        var sendParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { sender } }
+        };
+        ChooseKnightUltimateTargetClientRpc(knightId, ids.ToArray(), sendParams);
+    }
+
+    private List<ulong> GetKnightUltimateTargetIds(Piece knightPiece)
+    {
+        var ids = new List<ulong>();
+        var networkManager = NetworkManager.Singleton;
+        if (knightPiece == null || networkManager == null) return ids;
+
+        foreach (var entry in networkManager.SpawnManager.SpawnedObjects)
+        {
+            var netObj = entry.Value;
+            if (netObj == null || !netObj.IsSpawned) continue;
+
+            var piece = netObj.GetComponent<Piece>();
+            if (piece == null || piece.Team == knightPiece.Team) continue;
+
+            var np = netObj.GetComponent<NetworkPiece>();
+            if (np == null || np.IsCaptured.Value) continue;
+
+            ids.Add(netObj.NetworkObjectId);
+        }
+
+        return ids;
+    }
+
+    [ClientRpc]
+    void ChooseKnightUltimateTargetClientRpc(ulong knightId, ulong[] targetIds, ClientRpcParams _ = default)
+    {
+        var nm = NetworkManager.Singleton;
+        var board = FindObjectOfType<ChessBoard>();
+        if (nm == null || board == null) return;
+
+        var list = new List<Piece>();
+        foreach (var id in targetIds)
+            if (nm.SpawnManager.SpawnedObjects.TryGetValue(id, out var obj))
+                list.Add(obj.GetComponent<Piece>());
+
+        board.BeginTargetSelection(list, picked =>
+        {
+            if (picked == null) return;
+
+            var chosen = picked.GetComponent<NetworkObject>().NetworkObjectId;
+            SubmitKnightUltimateTargetServerRpc(knightId, chosen);
+        });
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    void SubmitKnightUltimateTargetServerRpc(ulong knightId, ulong targetId, ServerRpcParams rpcParams = default)
+    {
+        if (!TryValidatePieceCommand(knightId, rpcParams, out var knightPiece, out _, out _))
+            return;
+
+        if (!(knightPiece is Knight)) return;
+        if (!knightPiece.CanUseUltimate()) return;
+        if (knightPiece.StunnedTurns > 0) return;
+
+        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
+        if (!spawns.TryGetValue(targetId, out var targetObj)) return;
+        if (!targetObj.IsSpawned) return;
+
+        var target = targetObj.GetComponent<Piece>();
+        var np = targetObj.GetComponent<NetworkPiece>();
+        if (!target || !np || target.Team == knightPiece.Team || np.IsCaptured.Value) return;
+
+        var legalTargetIds = GetKnightUltimateTargetIds(knightPiece);
+        if (!legalTargetIds.Contains(targetId)) return;
+
+        np.Level.Value = 1;
+        np.StunnedTurns.Value = Mathf.Max(np.StunnedTurns.Value, 2);
+
+        target.UpdateLevel(1 - target.Level);
+        target.SetStunnedTurns(2);
+        knightPiece.SetUltimateUsed(true);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
     void SubmitRookUltimateTargetServerRpc(ulong rookId, ulong targetId, ServerRpcParams rpcParams = default)
     {
         if (!TryValidatePieceCommand(rookId, rpcParams, out var rookPiece, out var senderTeam, out var reason))
