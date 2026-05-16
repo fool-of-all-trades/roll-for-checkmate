@@ -475,16 +475,9 @@ public class ChessBoard : NetworkBehaviour
         bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
         if (!isMyTurn) return;
 
-        if (NetworkManager.Singleton.IsHost)
+        bool networkingActive = nm != null && nm.IsListening;
+        if (networkingActive)
         {
-            // The controller decides legality, capture, duels, en‑passant, castling, promotion...
-            // Host executes directly
-            controller.TryMove(selectedPiece, destRow, destCol);
-        }
-        else
-        {
-            //client asks politely => host validates and broadcasts
-            //but so far the host ignores me hard
             if (_moveRelay == null)
             {
                 _moveRelay = FindObjectOfType<MoveRelay>();
@@ -493,10 +486,22 @@ public class ChessBoard : NetworkBehaviour
                     Debug.LogError("[ChessBoard] No MoveRelay found!!!");
                 }
             }
-            _moveRelay.SendMove(selectedPiece, destRow, destCol);
-            //GetComponent<MoveRelay>().SendMove(selectedPiece, destRow, destCol);
-        }
 
+            if (_moveRelay != null)
+            {
+                _moveRelay.SendMove(selectedPiece, destRow, destCol);
+            }
+            else if (nm.IsServer)
+            {
+                // Fallback for host/server if relay wiring is unavailable.
+                controller.TryMove(selectedPiece, destRow, destCol);
+            }
+        }
+        else
+        {
+            // Fallback for non-networked/local play.
+            controller.TryMove(selectedPiece, destRow, destCol);
+        }
         selectedPiece = null;
         infoPiece = null;
     }

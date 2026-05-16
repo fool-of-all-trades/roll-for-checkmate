@@ -23,6 +23,13 @@ public class MoveRelay : NetworkBehaviour
         if (!TryValidatePieceCommand(pieceId, rpcParams, out var piece, out _, out _))
             return;
 
+        TryExecuteMoveCommand(piece, toRow, toCol);
+    }
+
+    private void TryExecuteMoveCommand(Piece piece, int toRow, int toCol)
+    {
+        if (piece == null) return;
+
         // If destination contains a captured piece somehow, ignore it
         var target = GameControllerMono.Instance?.PieceAt(toRow, toCol);
         if (target)
@@ -37,6 +44,21 @@ public class MoveRelay : NetworkBehaviour
     private bool TryValidatePieceCommand(
         ulong pieceId,
         ServerRpcParams rpcParams,
+        out Piece piece,
+        out TeamSide senderTeam,
+        out string failureReason)
+    {
+        return TryValidatePieceCommand(
+            pieceId,
+            rpcParams.Receive.SenderClientId,
+            out piece,
+            out senderTeam,
+            out failureReason);
+    }
+
+    private bool TryValidatePieceCommand(
+        ulong pieceId,
+        ulong senderClientId,
         out Piece piece,
         out TeamSide senderTeam,
         out string failureReason)
@@ -65,8 +87,7 @@ public class MoveRelay : NetworkBehaviour
             return false;
         }
 
-        var sender = rpcParams.Receive.SenderClientId;
-        senderTeam = PlayerTeams.GetTeam(sender);
+        senderTeam = PlayerTeams.GetTeam(senderClientId);
         if (senderTeam == TeamSide.None)
         {
             failureReason = "Sender has no team.";
@@ -233,11 +254,32 @@ public class MoveRelay : NetworkBehaviour
             Debug.LogWarning("[MoveRelay] Not spawned yet – cannot send move.");
             return;
         }
+        if (piece == null) return;
+
         var netObj = piece.GetComponent<NetworkObject>();
-        RequestMoveServerRpc(netObj.NetworkObjectId, toRow, toCol);
+        if (netObj == null) return;
 
+        if (IsServer)
+        {
+            var networkManager = NetworkManager.Singleton;
+            if (networkManager == null) return;
 
-        Debug.Log($"[Client] Sending move of {piece.name} -> {toRow},{toCol}");
+            if (!TryValidatePieceCommand(
+                    netObj.NetworkObjectId,
+                    networkManager.LocalClientId,
+                    out var validatedPiece,
+                    out _,
+                    out _))
+                return;
+
+            TryExecuteMoveCommand(validatedPiece, toRow, toCol);
+        }
+        else
+        {
+            RequestMoveServerRpc(netObj.NetworkObjectId, toRow, toCol);
+        }
+
+        Debug.Log($"[MoveRelay] Sending move of {piece.name} -> {toRow},{toCol}");
     }
 
     public void SendUltimate(Piece piece)
