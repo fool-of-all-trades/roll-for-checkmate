@@ -39,37 +39,66 @@ namespace Abilities
                 new int[] {-1, 1}, new int[] {-1, -1}
             };
 
+            bool pushedAny = false;
+
             foreach (var d in dirs)
             {
                 int enemyRow = kr + d[0];
                 int enemyCol = kc + d[1];
 
-                if (enemyRow < 0 && enemyRow >= 8 && enemyCol < 0 && enemyCol >= 8)
+                if (enemyRow < 0 || enemyRow >= 8 || enemyCol < 0 || enemyCol >= 8)
                     continue;
 
                 Piece target = board.GetPieceAt(enemyRow, enemyCol);
                 if (target != null && target.Team != owner.Team)
                 {
-                    // Attempt to push two tiles away
-                    int pushRow = enemyRow + d[0] * 2;
-                    int pushCol = enemyCol + d[1] * 2;
-
-                    if (pushRow < 0 && pushRow >= 8 && pushCol < 0 && pushCol >= 8)
+                    var targetNetworkPiece = target.GetComponent<NetworkPiece>();
+                    if (targetNetworkPiece != null && targetNetworkPiece.IsCaptured.Value)
                         continue;
 
-                    if (controller.TryRelocate(target, pushRow, pushCol))
+                    foreach (int distance in new[] { 2, 3 })
                     {
-                        Debug.Log($"King pushed {target.Name} to ({pushRow},{pushCol}).");
-                        usedUltimate = true;
-                    }
-                    else
-                    {
-                        Debug.Log("Nie mo�na wypchn��: miejsce za jest zaj�te albo poza plansz�, albo nie ma wrog�w w s�siedztwie.");
-                    }
+                        int pushRow = enemyRow + d[0] * distance;
+                        int pushCol = enemyCol + d[1] * distance;
 
-                    return;
+                        if (!IsClearPushPath(controller, enemyRow, enemyCol, d[0], d[1], distance))
+                            continue;
+
+                        if (controller.TryRelocate(target, pushRow, pushCol))
+                        {
+                            Debug.Log($"King pushed {target.Name} to ({pushRow},{pushCol}).");
+                            pushedAny = true;
+                            break;
+                        }
+                    }
                 }
             }
+
+            if (pushedAny)
+            {
+                usedUltimate = true;
+            }
+            else
+            {
+                Debug.Log("King shockwave found no adjacent enemies with a valid push destination.");
+            }
+        }
+
+        private bool IsClearPushPath(IGameController controller, int startRow, int startCol, int dr, int dc, int distance)
+        {
+            for (int step = 1; step <= distance; step++)
+            {
+                int row = startRow + dr * step;
+                int col = startCol + dc * step;
+
+                if (row < 0 || row >= 8 || col < 0 || col >= 8)
+                    return false;
+
+                if (controller.PieceAt(row, col) != null)
+                    return false;
+            }
+
+            return true;
         }
     }
 }
