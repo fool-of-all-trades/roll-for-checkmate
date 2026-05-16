@@ -240,6 +240,22 @@ public class MoveRelay : NetworkBehaviour
         Debug.Log($"[Client] Sending move of {piece.name} -> {toRow},{toCol}");
     }
 
+    public void SendUltimate(Piece piece)
+    {
+        if (piece == null) return;
+
+        var netObj = piece.GetComponent<NetworkObject>();
+        if (netObj == null) return;
+
+        var id = netObj.NetworkObjectId;
+        if (piece is Rook)
+            StartRookUltimateServerRpc(id);
+        else if (piece is Knight)
+            StartKnightUltimateServerRpc(id);
+        else
+            RequestUltimateServerRpc(id);
+    }
+
     private void OnDuelRolled(int raw)
     {
         // Update host UI immediately
