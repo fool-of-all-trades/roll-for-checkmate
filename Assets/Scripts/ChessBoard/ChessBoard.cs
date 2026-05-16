@@ -47,7 +47,16 @@ public class ChessBoard : NetworkBehaviour
     private Piece infoPiece;
 
     private Action<Piece> pendingTargetCallback;
-    private bool targetMode;   // when true, HandleClick calls the pendingTargetCallback
+    private IReadOnlyList<Piece> pendingTargetChoices;
+
+    private enum BoardInputMode
+    {
+        Normal,
+        TargetSelection
+    }
+
+    private BoardInputMode _inputMode = BoardInputMode.Normal;
+    private bool IsTargetSelectionActive => _inputMode == BoardInputMode.TargetSelection;
 
     [Header("References")]
     [SerializeField] private MonoBehaviour controllerRoot; 
@@ -134,6 +143,7 @@ public class ChessBoard : NetworkBehaviour
         pieces.Clear();
         selectedPiece = null;
         infoPiece = null;
+        ExitTargetSelection();
     }
 
     // Helper to be extra safe if you want to hard-reset visuals on new sessions
@@ -531,10 +541,13 @@ public class ChessBoard : NetworkBehaviour
     {
         var clickedPiece = GetPieceAt(row, col);
 
-        // targetMode is for when Knight's ultimate is active
-        if (targetMode)
+        if (IsTargetSelectionActive)
         {
-            pendingTargetCallback?.Invoke(clickedPiece);
+            if (clickedPiece != null && pendingTargetChoices != null && pendingTargetChoices.Contains(clickedPiece))
+                CompleteTargetSelection(clickedPiece);
+            else
+                CancelTargetSelection();
+
             return;   // ignore normal selection logic while targeting for DIVINE SMITE
         }
 
@@ -700,32 +713,42 @@ public class ChessBoard : NetworkBehaviour
         IReadOnlyList<Piece> targets,
         Action<Piece> onChosen)
     {
-        targetMode = true;
+        EnterTargetSelection(targets, onChosen);
 
         // highlight only targets
-        foreach (var p in targets) 
-            //HighlightSquare(p.Row, p.Col, Color.yellow);
-
-        pendingTargetCallback = p =>
+        foreach (var p in targets)
         {
-            // only accept clicks on listed targets
-            if (!targetMode) return;
-            if (p != null && targets.Contains(p))
-            {
-                onChosen?.Invoke(p);
-                //ClearHighlights();
-                targetMode = false;
-                pendingTargetCallback = null;
-            }
-            else
-            {
-                // clicked elsewhere -> cancel
-                //ClearHighlights();
-                targetMode = false;
-                pendingTargetCallback = null;
-                onChosen?.Invoke(null);          // signal cancel
-            }
-        };
+            //HighlightSquare(p.Row, p.Col, Color.yellow);
+        }
+    }
+
+    private void EnterTargetSelection(IReadOnlyList<Piece> targets, Action<Piece> onChosen)
+    {
+        pendingTargetChoices = targets;
+        pendingTargetCallback = onChosen;
+        _inputMode = BoardInputMode.TargetSelection;
+    }
+
+    private void ExitTargetSelection()
+    {
+        //ClearHighlights();
+        _inputMode = BoardInputMode.Normal;
+        pendingTargetChoices = null;
+        pendingTargetCallback = null;
+    }
+
+    private void CancelTargetSelection()
+    {
+        CompleteTargetSelection(null);
+    }
+
+    private void CompleteTargetSelection(Piece target)
+    {
+        if (!IsTargetSelectionActive) return;
+
+        var callback = pendingTargetCallback;
+        ExitTargetSelection();
+        callback?.Invoke(target);
     }
 
     public void SetMoveRelay(MoveRelay relay)
