@@ -54,6 +54,7 @@ public class ChessBoard : NetworkBehaviour
     private IGameController controller;
 
     private MoveRelay _moveRelay;
+    private bool _moveRelayLookupWarningLogged;
 
     #region Unity Lifecycle
 
@@ -68,6 +69,32 @@ public class ChessBoard : NetworkBehaviour
 
         //if (_moveRelay == null)
         //    Debug.LogError("ChessBoard: _moveRelay is null!");
+    }
+
+    private bool TryGetMoveRelay(out MoveRelay relay)
+    {
+        if (_moveRelay != null)
+        {
+            relay = _moveRelay;
+            return true;
+        }
+
+        _moveRelay = FindObjectOfType<MoveRelay>();
+        relay = _moveRelay;
+
+        if (relay != null)
+        {
+            _moveRelayLookupWarningLogged = false;
+            return true;
+        }
+
+        if (!_moveRelayLookupWarningLogged)
+        {
+            Debug.LogError("[ChessBoard] No MoveRelay found.");
+            _moveRelayLookupWarningLogged = true;
+        }
+
+        return false;
     }
 
     // --- add at top of class ---
@@ -478,18 +505,9 @@ public class ChessBoard : NetworkBehaviour
         bool networkingActive = nm != null && nm.IsListening;
         if (networkingActive)
         {
-            if (_moveRelay == null)
+            if (TryGetMoveRelay(out var relay))
             {
-                _moveRelay = FindObjectOfType<MoveRelay>();
-                if (_moveRelay == null)
-                {
-                    Debug.LogError("[ChessBoard] No MoveRelay found!!!");
-                }
-            }
-
-            if (_moveRelay != null)
-            {
-                _moveRelay.SendMove(selectedPiece, destRow, destCol);
+                relay.SendMove(selectedPiece, destRow, destCol);
             }
             else if (nm.IsServer)
             {
@@ -549,14 +567,12 @@ public class ChessBoard : NetworkBehaviour
         else
         {
             // Client asks the host
-            if (_moveRelay == null) _moveRelay = FindObjectOfType<MoveRelay>();
-            if (_moveRelay == null)
+            if (!TryGetMoveRelay(out var relay))
             {
-                Debug.LogError("[UI] No MoveRelay found for ultimate!");
                 return;
             }
 
-            _moveRelay.SendUltimate(selectedPiece);
+            relay.SendUltimate(selectedPiece);
         }
     }
 
@@ -715,6 +731,10 @@ public class ChessBoard : NetworkBehaviour
     public void SetMoveRelay(MoveRelay relay)
     {
         _moveRelay = relay;
+        if (relay != null)
+        {
+            _moveRelayLookupWarningLogged = false;
+        }
     }
 
 }
