@@ -429,6 +429,37 @@ public class ChessBoard : NetworkBehaviour
     {
         p.SetViewPosition(row, col);
     }
+
+    private bool TryGetLocalTeam(out TeamSide team)
+    {
+        var nm = NetworkManager.Singleton;
+        team = (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned && nm != null)
+            ? PlayerTeams.GetTeam(nm.LocalClientId)
+            : TeamSide.Black; // safe default
+
+        return team != TeamSide.None;
+    }
+
+    private bool IsLocalPlayersTurn(TeamSide team)
+    {
+        bool teamIsWhite = (team == TeamSide.White);
+        return teamIsWhite == TurnSync.IsWhiteTurn;
+    }
+
+    private bool CanSelectPieceForMove(Piece piece)
+    {
+        if (piece == null) return false;
+
+        var np = piece.GetComponent<NetworkPiece>();
+        if (np && np.IsCaptured.Value) return false;
+
+        if (!TryGetLocalTeam(out var localTeam)) return false;
+        if (!IsLocalPlayersTurn(localTeam)) return false;
+
+        bool localTeamIsWhite = (localTeam == TeamSide.White);
+        return piece.Team == localTeamIsWhite;
+    }
+
     #endregion
 
     #region Input Handling
@@ -446,20 +477,7 @@ public class ChessBoard : NetworkBehaviour
             return;
         }
 
-        var np = p.GetComponent<NetworkPiece>();
-        if (np && np.IsCaptured.Value) return;
-
-        var nm = NetworkManager.Singleton;
-        var myTeam = (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned)
-            ? PlayerTeams.GetTeam(nm.LocalClientId)
-            : TeamSide.Black; // safe default
-
-        bool myTeamIsWhite = (myTeam == TeamSide.White);
-
-
-        bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
-
-        if (p != null && p.Team == myTeamIsWhite && isMyTurn)
+        if (CanSelectPieceForMove(p))
         {
             selectedPiece = p;
         }
@@ -473,18 +491,9 @@ public class ChessBoard : NetworkBehaviour
     private void AttemptMove(int destRow, int destCol)
     {
         if (selectedPiece == null) return;
+        if (!CanSelectPieceForMove(selectedPiece)) return;
 
         var nm = NetworkManager.Singleton;
-        var myTeam = (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned)
-            ? PlayerTeams.GetTeam(nm.LocalClientId)
-            : TeamSide.Black; // safe default
-
-        bool myTeamIsWhite = (myTeam == TeamSide.White);
-
-
-        bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
-        if (!isMyTurn) return;
-
         bool networkingActive = nm != null && nm.IsListening;
         if (networkingActive)
         {
