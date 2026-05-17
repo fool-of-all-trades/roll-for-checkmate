@@ -64,6 +64,7 @@ public class ChessBoard : NetworkBehaviour
 
     private MoveRelay _moveRelay;
     private bool _moveRelayLookupWarningLogged;
+    private readonly ChessBoardStartupCoordinator _startupCoordinator = new ChessBoardStartupCoordinator();
 
     #region Unity Lifecycle
 
@@ -106,14 +107,12 @@ public class ChessBoard : NetworkBehaviour
         return false;
     }
 
-    // --- add at top of class ---
     private bool _wired;
     private bool _spawnedThisRun;
 
-    // --- add (or keep) these safely ---
     private void OnEnable()
     {
-        // you can also leave this empty; we'll rely on OnNetworkSpawn/Despawn instead
+        // we'll rely on OnNetworkSpawn/Despawn instead
     }
     private void OnDisable() { }
 
@@ -174,22 +173,19 @@ public class ChessBoard : NetworkBehaviour
         ultimateButton.gameObject.SetActive(false);
 
         // wait until networking actually started
-        yield return new WaitUntil(() =>
-            NetworkManager.Singleton != null &&
-            (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient));
+        yield return StartCoroutine(_startupCoordinator.WaitForNetworkStarted());
 
         // wait until PlayerTeams exists & is spawned
-        yield return new WaitUntil(() =>
-            PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned);
+        yield return StartCoroutine(_startupCoordinator.WaitForPlayerTeamsReady());
 
         // NEW: wait until we actually have a seat (clients only)
         if (!NetworkManager.Singleton.IsServer)
         {
-            yield return new WaitUntil(() => PlayerTeams.MyTeam != TeamSide.None);
+            yield return StartCoroutine(_startupCoordinator.WaitForClientSeat());
         }
 
         // after waiting for networking + PlayerTeams (and optional seat for clients)
-        yield return new WaitUntil(() => TurnSync.Instance != null);
+        yield return StartCoroutine(_startupCoordinator.WaitForTurnSync());
 
         // subscribe & set initial label
         TurnSync.Instance.WhiteTurn.OnValueChanged += OnWhiteTurnChanged;
@@ -210,27 +206,9 @@ public class ChessBoard : NetworkBehaviour
         }
 
         // client path
-        yield return StartCoroutine(WaitForBoardClient());
+        yield return StartCoroutine(_startupCoordinator.WaitForClientBoardPieces(clientPieces => pieces = clientPieces));
         controller.Initialize(pieces);
         _ready = true;
-    }
-
-    private IEnumerator WaitForBoardClient()
-    {
-        // wait until at least one piece exists
-        yield return new WaitUntil(() => FindObjectsOfType<Piece>().Length > 0);
-
-        // wait until the count stabilizes for a few frames
-        int lastCount = -1, stableFrames = 0;
-        while (stableFrames < 3)
-        {
-            var current = FindObjectsOfType<Piece>();
-            if (current.Length == lastCount) stableFrames++;
-            else { stableFrames = 0; lastCount = current.Length; }
-            yield return null;
-        }
-
-        pieces = new List<Piece>(FindObjectsOfType<Piece>());
     }
 
 
@@ -377,11 +355,6 @@ public class ChessBoard : NetworkBehaviour
 
     // Flip UI helpers
     private const int BoardSize = 8;
-    //private bool IsWhitePerspective =>
-    //    NetworkManager.Singleton == null
-    //        ? true
-    //        : (NetworkManager.Singleton.IsHost            // host is white
-    //           || PlayerTeams.MyTeam == TeamSide.White);  // client white (spectator/local test)
 
     private bool IsWhitePerspective
     {
@@ -647,10 +620,6 @@ public class ChessBoard : NetworkBehaviour
     }
 
     private void OnWhiteTurnChanged(bool _, bool __) => RefreshTurnLabel();
-
-
-
-
 
 
     #endregion
