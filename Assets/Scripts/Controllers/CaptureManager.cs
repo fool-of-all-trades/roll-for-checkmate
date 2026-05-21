@@ -1,5 +1,6 @@
 using Pieces;
 using System.Collections.Generic;
+using Unity.Netcode;
 
 public class CaptureManager
 {
@@ -22,7 +23,8 @@ public class CaptureManager
         if (captured == null) return;
 
         pieces.Remove(captured);
-        captured.gameObject.SetActive(false);
+        // captured.gameObject.SetActive(false);
+        // Captured visuals are handled by NetworkPiece.IsCaptured on all clients.
 
         if (captured.Team) whiteCaptured.Add(captured);
         else blackCaptured.Add(captured);
@@ -32,6 +34,13 @@ public class CaptureManager
             winner.UpdateLevel(captured is Pawn ? 1 : 2);
             if (winner.Level > 5)
                 winner.UpdateLevel(5 - winner.Level);
+        }
+
+        // so that the client can also see the updated level
+        if (NetworkManager.Singleton && NetworkManager.Singleton.IsServer)
+        {
+            var np = winner.GetComponent<NetworkPiece>();
+            if (np) np.Level.Value = winner.Level;
         }
     }
 }

@@ -1,5 +1,7 @@
 using UnityEngine;
 using Abilities;
+using Unity.Netcode;
+using static UnityEngine.Rendering.DebugUI;
 
 namespace Pieces
 {
@@ -58,7 +60,7 @@ namespace Pieces
         }
 
         /// <summary>
-        /// Sets row/col and the GameObject’s transform.position.
+        /// Sets row/col and the GameObject's transform.position.
         /// Used in the ChessBoard (view layer).
         /// </summary>
         /// <param name="newRow"></param>
@@ -71,12 +73,26 @@ namespace Pieces
         }
 
         /// <summary>
-        /// Sets row/col but does not touch the GameObject’s transform.position.
+        /// Sets row/col but does not touch the GameObject's transform.position.
         /// Used in the controller/services (logic layer).
         /// </summary>
         public void SetBoardCoords(int r, int c)
         {
             //if it did update the transform.position then the Piece would teleport twice
+            row = r;
+            col = c;
+
+            var np = GetComponent<NetworkPiece>();
+            if (np != null && np.IsServer)
+                np.CommitGridPos(r, c);      // replicates to everyone so that the client can see host's moves
+        }
+
+        /// <summary>
+        /// Sets row/col for temporary rule simulations only.
+        /// Does not move visuals or replicate network state.
+        /// </summary>
+        public void SetBoardCoordsForSimulation(int r, int c)
+        {
             row = r;
             col = c;
         }
@@ -96,15 +112,26 @@ namespace Pieces
         public void DecreaseCursedTurns()
         {
             if (cursedTurns > 0) cursedTurns--;
+
+            var np = GetComponent<NetworkPiece>();
+            if (np != null && np.IsServer)
+                np.CursedTurns.Value = cursedTurns;
         }
 
         public void SetCursedTurns(int t) => cursedTurns = t;
 
-        public void SetStunnedTurns(int turns) => stunnedTurns = turns;
+        public void SetStunnedTurns(int turns, bool replicate = true)
+        {
+            stunnedTurns = Mathf.Max(0, turns);
+
+            if (replicate && NetworkManager.Singleton && NetworkManager.Singleton.IsServer)
+                GetComponent<NetworkPiece>().StunnedTurns.Value = stunnedTurns;
+        }
 
         public void TickStunnedTurns() 
-        { 
-            if (stunnedTurns > 0) stunnedTurns--; 
+        {
+            if (stunnedTurns > 0)
+                SetStunnedTurns(stunnedTurns - 1);
         }
 
         public bool IsStunned() => this != null && this.StunnedTurns > 0;

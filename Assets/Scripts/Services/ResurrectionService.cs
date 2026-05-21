@@ -2,6 +2,7 @@
 using System.Linq;
 using UnityEngine;
 using Pieces;
+using Unity.Netcode;
 
 public class ResurrectionService : MonoBehaviour, IResurrectionService
 {
@@ -113,7 +114,23 @@ public class ResurrectionService : MonoBehaviour, IResurrectionService
     {
         piece.ChangeTeam(team);
         piece.gameObject.SetActive(true);
-        
+
+
+        var np = piece.GetComponent<NetworkPiece>();
+        if (np && np.IsServer)
+        {
+            // Make it alive again across the network
+            np.IsCaptured.Value = false;
+
+            // Optional but helpful for late joiners / resync
+            np.Row.Value = r;
+            np.Col.Value = c;
+        }
+
+        // ensure active (if ever deactivated the GO elsewhere)
+        piece.gameObject.SetActive(true);
+
+
         // we do NOT call SetGridPosition (that is used in ChessBoard)
         // here we use controller’s addPieceToBoard
         addPieceToBoard(piece, r, c);

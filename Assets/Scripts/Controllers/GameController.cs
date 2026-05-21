@@ -3,11 +3,14 @@ using UnityEngine;
 using Pieces;
 using System.Linq;
 using System;
+using Unity.Netcode;
+using static UnityEngine.GraphicsBuffer;
+using System.Reflection;
 
 namespace Controller
 {
     [DisallowMultipleComponent]
-    public class GameControllerMono : MonoBehaviour, IGameController
+    public class GameControllerMono : NetworkBehaviour, IGameController
     {
         List<Piece> pieces;
 
@@ -52,6 +55,10 @@ namespace Controller
         [SerializeField] private MonoBehaviour resurrectionRoot;
         IResurrectionService resurrector;
 
+
+        private Dictionary<ulong, bool> _clientTeams = new Dictionary<ulong, bool>();
+        public static GameControllerMono Instance { get; private set; }
+
         void Awake()
         {
             checker = new Checker(PieceAt);
@@ -66,6 +73,12 @@ namespace Controller
 
             resurrector = (ResurrectionService)resurrectionRoot;
             resurrector.Init(PieceAt, AddPieceToBoard, captureManager);
+
+
+            if (Instance != null && Instance != this)
+                Destroy(gameObject);
+            else
+                Instance = this;
         }
 
         /// <summary>
@@ -96,14 +109,17 @@ namespace Controller
 
                     if (!duelResult.AttackerWon)
                     {
-                        // Attacker died, defender survives – turn ends here
-                        captureManager.CapturePiece(pieces, piece, target);   // defender levels up
+                        // Attacker died, defender survives and levels up – turn ends here
+                        captureManager.CapturePiece(pieces, piece, target);
 
-                        turnMgr.ToggleTurn();
-                        queensCurse.TickTurn();
+                        // After client reconnect they won't see ghosts of captured pieces
+                        if (IsServer)
+                        {
+                            var npA = piece.GetComponent<NetworkPiece>();
+                            if (npA) npA.IsCaptured.Value = true;
+                        }
 
-                        foreach (var stunnedPiece in pieces)
-                            stunnedPiece.TickStunnedTurns();
+                        AdvanceTurn();
 
                         if (IsGameOver(piece))
                         {
@@ -120,9 +136,24 @@ namespace Controller
                 captureManager.CapturePiece(pieces, target, piece);       // attacker levels up
                 captured = target;           // for MoveResult
 
+                // After client reconnect they won't see ghosts of captured pieces
+                if (IsServer)
+                {
+                    var npD = target.GetComponent<NetworkPiece>();
+                    if (npD) npD.IsCaptured.Value = true;
+                }
+
                 if (target is Queen)
+                {
                     queensCurse.ApplyCurse(piece, 6);
-            }
+
+                    if (NetworkManager.Singleton.IsServer)
+                    {
+                        var np = piece.GetComponent<NetworkPiece>();
+                        if (np) np.CursedTurns.Value = 6;
+                    }
+                }
+                }
 
 
             // ----- en‑passant capture BEFORE commit -----
@@ -137,6 +168,13 @@ namespace Controller
                     {
                         captureManager.CapturePiece(pieces, victim, pawn);
                         captured = victim;           // include in MoveResult
+
+                        // After client reconnect they won't see ghosts of captured pieces
+                        if (IsServer)
+                        {
+                            var npV = victim.GetComponent<NetworkPiece>();
+                            if (npV) npV.IsCaptured.Value = true;
+                        }
                     }
                 }
             }
@@ -182,11 +220,7 @@ namespace Controller
 
             sacredRoad.ProcessMove(piece);
 
-            turnMgr.ToggleTurn();          // flip side & clear old en‑passant square
-            queensCurse.TickTurn();
-
-            foreach (var stunnedPiece in pieces)
-                stunnedPiece.TickStunnedTurns();
+            AdvanceTurn();
 
             if (IsGameOver(piece))
             {
@@ -196,6 +230,15 @@ namespace Controller
 
             return true;
         }
+
+        void AdvanceTurn()
+        {
+            turnMgr.ToggleTurn();
+            TurnSync.Instance?.CommitTurn(turnMgr.WhiteTurn);
+            queensCurse.TickTurn();
+            foreach (var p in pieces) p.TickStunnedTurns();
+        }
+
 
         /// <summary>
         /// Relocates a piece instantly if destination is empty (used for King ultimate).
@@ -295,7 +338,15 @@ namespace Controller
         {
             captureManager.CapturePiece(pieces, captured, winner);
             if (captured is Queen)
+            {
                 queensCurse.ApplyCurse(winner, 6);  // 6 half-moves = 3 full turns
+
+                if (NetworkManager.Singleton.IsServer)
+                {
+                    var np = winner.GetComponent<NetworkPiece>();
+                    if (np) np.CursedTurns.Value = 6;
+                }
+            }
         }
 
     }

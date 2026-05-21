@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Pieces;
+using Unity.Netcode;
 
 /// <summary>
 /// Manages the "sacred road" which is Bishop's base ability.
@@ -97,11 +98,19 @@ public class SacredRoadService : MonoBehaviour, ISacredRoadService
     /// </summary>
     void ApplyEffect(Piece trespasser, bool roadTeam)
     {
+        // Only the host/server should apply gameplay effects
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
+            return;
+
         // we only punish the enemies
         if (trespasser.Team != roadTeam)
         {
             trespasser.UpdateLevel(-1);
             Debug.Log($"{trespasser.Name} crossed enemy sacred road, new level {trespasser.Level}");
+
+            // push replicated level
+            var np = trespasser.GetComponent<NetworkPiece>();
+            if (np) np.Level.Value = trespasser.Level;
 
             // if the trespasser has no level left, switch teams and reset level to 1
             if (trespasser.Level <= 0)
@@ -109,6 +118,14 @@ public class SacredRoadService : MonoBehaviour, ISacredRoadService
                 bool oldTeam = trespasser.Team;
                 trespasser.ChangeTeam(!oldTeam);
                 trespasser.UpdateLevel(1);
+
+                // push replicated team + level
+                if (np)
+                {
+                    np.Team.Value = trespasser.Team;   // bool: true=White, false=Black
+                    np.Level.Value = trespasser.Level;  // ensure clients see 1
+                }
+
                 Debug.Log($"{trespasser.Name} switches to {(trespasser.Team ? "White" : "Black")} at level {trespasser.Level}");
             }
         }

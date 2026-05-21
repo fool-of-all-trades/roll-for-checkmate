@@ -1,6 +1,8 @@
 using Pieces;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Netcode;
+using System.Linq;
 
 namespace Abilities
 {
@@ -48,7 +50,37 @@ namespace Abilities
                         return;
                     }
 
-                    controller.CapturePiece(target, owner);   // XP + hide prefab
+                    // --- authoritative changes must happen on the server ---
+                    if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
+                    {
+                        Debug.LogWarning("[RookUltimate] Selection callback on non-server; ignoring.");
+                        return;
+                    }
+
+                    // Ignore already-captured targets (race safety)
+                    var tnp = target.GetComponent<NetworkPiece>();
+                    if (tnp == null)
+                    {
+                        Debug.LogError("[RookUltimate] Target has no NetworkPiece.");
+                        return;
+                    }
+                    if (tnp.IsCaptured.Value)
+                    {
+                        Debug.Log("[RookUltimate] Target already captured.");
+                        return;
+                    }
+
+                    // Replicate capture to everyone
+                    tnp.IsCaptured.Value = true;
+
+                    // Level/curse/etc. handled here
+                    controller.CapturePiece(target, owner); // XP + hide prefab
+
+                    // (Optional) push owner level so clients see the XP gain instantly
+                    var onp = owner.GetComponent<NetworkPiece>();
+                    if (onp != null)
+                        onp.Level.Value = owner.Level;
+
                     Debug.Log($"Rook sniped {target.Name} at ({target.Row},{target.Col})");
                     usedUltimate = true;
                 }
@@ -76,6 +108,10 @@ namespace Abilities
 
                     Piece p = ctrl.PieceAt(r, c);
                     if (p == null) continue;
+
+                    // if the first piece is unseen/captured somehow, skip it anyway
+                    var np = p.GetComponent<NetworkPiece>();
+                    if (np != null && np.IsCaptured.Value) continue;
 
                     if (!skipped)
                         skipped = true; // skip the first piece in this ray

@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using Pieces;
@@ -7,11 +7,14 @@ using System;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
 using System.Linq;
+using Unity.Netcode;
+using System.Collections;
+
 
 /// <summary>
 /// Renders the board, spawns pieces, handles input, and updates UI.
 /// </summary>
-public class ChessBoard : MonoBehaviour
+public class ChessBoard : NetworkBehaviour
 {
     [Header("Grid Settings")]
     public int tileSize = 1;
@@ -31,12 +34,14 @@ public class ChessBoard : MonoBehaviour
     [Header("UI Elements")]
     // public Image diceImage;
     public TMP_Text rollText;
-    public GameObject infoPanel;
     public TMP_Text infoNameText;
     public TMP_Text infoTeamText;
     public TMP_Text infoLevelText;
     public Image infoSpriteImage;
     public Button ultimateButton;
+    public TMP_Text infoTurnText;
+    public TMP_Text infoStunnedText;
+    public TMP_Text infoCursedText;
 
     private Piece selectedPiece;
     private Piece infoPiece;
@@ -48,6 +53,8 @@ public class ChessBoard : MonoBehaviour
     [SerializeField] private MonoBehaviour controllerRoot; 
     private IGameController controller;
 
+    private MoveRelay _moveRelay;
+
     #region Unity Lifecycle
 
     private void Awake()
@@ -58,15 +65,137 @@ public class ChessBoard : MonoBehaviour
         controller.OnMoveAccepted += ApplyMoveVisuals;
         controller.OnDuelRolled += ShowRoll;
         controller.OnRoadsChanged += ShowRoads;
+
+        //if (_moveRelay == null)
+        //    Debug.LogError("ChessBoard: _moveRelay is null!");
     }
 
-    private void Start()
+    // --- add at top of class ---
+    private bool _wired;
+    private bool _spawnedThisRun;
+
+    // --- add (or keep) these safely ---
+    private void OnEnable()
     {
-        AddPieces();
-        controller.Initialize(pieces);
+        // you can also leave this empty; we'll rely on OnNetworkSpawn/Despawn instead
+    }
+    private void OnDisable() { }
+
+    // --- NEW: network lifecycle handlers ---
+    public override void OnNetworkSpawn()
+    {
+        // Server/Host: (re)spawn board every time networking starts
+        if (IsServer && !_spawnedThisRun)
+        {
+            // (Optional) if anything somehow survived, nuke it
+            CleanupLocalPieces();
+
+            AddPieces();
+            controller.Initialize(pieces);
+            _spawnedThisRun = true;
+            _ready = true;
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        // Reset per-session flags so next StartHost works
+        _spawnedThisRun = false;
+        _ready = false;
+
+        // local list points to destroyed objects after shutdown; clear it
+        pieces.Clear();
+        selectedPiece = null;
+        infoPiece = null;
+    }
+
+    // Helper to be extra safe if you want to hard-reset visuals on new sessions
+    private void CleanupLocalPieces()
+    {
+        var existing = FindObjectsOfType<Piece>();
+        foreach (var p in existing)
+        {
+            if (p && p.TryGetComponent<NetworkObject>(out var no))
+            {
+                if (no.IsSpawned) no.Despawn(true);
+                else Destroy(no.gameObject);
+            }
+            else if (p) // non-network piece (shouldn’t happen, but safe)
+            {
+                Destroy(p.gameObject);
+            }
+        }
+        pieces.Clear();
+    }
+
+    private bool _ready;
+
+    private IEnumerator Start()
+    {
+        // UI wiring stays
         ultimateButton.onClick.AddListener(OnUltimateButtonClicked);
         ultimateButton.gameObject.SetActive(false);
+
+        // wait until networking actually started
+        yield return new WaitUntil(() =>
+            NetworkManager.Singleton != null &&
+            (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient));
+
+        // wait until PlayerTeams exists & is spawned
+        yield return new WaitUntil(() =>
+            PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned);
+
+        // NEW: wait until we actually have a seat (clients only)
+        if (!NetworkManager.Singleton.IsServer)
+        {
+            yield return new WaitUntil(() => PlayerTeams.MyTeam != TeamSide.None);
+        }
+
+        // after waiting for networking + PlayerTeams (and optional seat for clients)
+        yield return new WaitUntil(() => TurnSync.Instance != null);
+
+        // subscribe & set initial label
+        TurnSync.Instance.WhiteTurn.OnValueChanged += OnWhiteTurnChanged;
+        RefreshTurnLabel();
+
+        // small sync frame
+        yield return null;
+
+        var myTeam = NetworkManager.Singleton.IsServer ? TeamSide.White : PlayerTeams.MyTeam;
+        Debug.Log($"I am {myTeam}");
+
+        if (NetworkManager.Singleton.IsServer)
+        {
+            //AddPieces();
+            //controller.Initialize(pieces);
+            //_ready = true;
+            yield break;
+        }
+
+        // client path
+        yield return StartCoroutine(WaitForBoardClient());
+        controller.Initialize(pieces);
+        _ready = true;
     }
+
+    private IEnumerator WaitForBoardClient()
+    {
+        // wait until at least one piece exists
+        yield return new WaitUntil(() => FindObjectsOfType<Piece>().Length > 0);
+
+        // wait until the count stabilizes for a few frames
+        int lastCount = -1, stableFrames = 0;
+        while (stableFrames < 3)
+        {
+            var current = FindObjectsOfType<Piece>();
+            if (current.Length == lastCount) stableFrames++;
+            else { stableFrames = 0; lastCount = current.Length; }
+            yield return null;
+        }
+
+        pieces = new List<Piece>(FindObjectsOfType<Piece>());
+    }
+
 
     private void OnDestroy()
     {
@@ -76,8 +205,12 @@ public class ChessBoard : MonoBehaviour
             controller.OnMoveAccepted -= ApplyMoveVisuals;
             controller.OnDuelRolled -= ShowRoll;
             controller.OnRoadsChanged -= ShowRoads;
+            if (TurnSync.Instance != null)
+                TurnSync.Instance.WhiteTurn.OnValueChanged -= OnWhiteTurnChanged;
+
         }
     }
+
 
     /// <summary>
     /// Detects clicks outside UI and routes to selection or move logic.
@@ -87,17 +220,24 @@ public class ChessBoard : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-            {
                 return;
-            }
 
-            Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            int col = Mathf.FloorToInt(worldPos.x / tileSize);
-            int row = Mathf.FloorToInt(worldPos.y / tileSize);
-            HandleClick(row, col);
+            var cam = Camera.main;
+            if (!cam) return;
+
+            Vector3 worldPos = cam.ScreenToWorldPoint(Input.mousePosition);
+            Vector3Int cell = boardTilemap.WorldToCell(worldPos);
+
+            int viewRow = cell.y;
+            int viewCol = cell.x;
+
+            var (modelRow, modelCol) = ViewToModel(viewRow, viewCol);
+
+            HandleClick(modelRow, modelCol);
             UpdateUI();
         }
     }
+
     #endregion
 
     #region Board Initialization
@@ -146,13 +286,32 @@ public class ChessBoard : MonoBehaviour
     /// </summary>
     private void SpawnPiece(GameObject prefab, int row, int col, bool team)
     {
+        // Only the host will create & spawn networked objects
+        if (!NetworkManager.Singleton.IsServer) return;
+
         Vector3 worldPos = GridToWorld(row, col);
 
         var go = Instantiate(prefab, worldPos, Quaternion.identity, boardTilemap.transform);
 
+        // Local init (row/col, sprite, etc.)
         var piece = go.GetComponent<Piece>();
         piece.Init(this, row, col, team);
-        pieces.Add(piece);
+
+        // Network init
+        var netPiece = go.GetComponent<NetworkPiece>();
+        //netPiece.InitNetwork(team);
+        //netPiece.CommitGridPos(row, col);
+
+        //var netObj = go.GetComponent<NetworkObject>();
+        //netObj.Spawn(true); // host-owned; replicates to all clients
+
+        var netObj = go.GetComponent<NetworkObject>();
+        netObj.Spawn(true);                   // now IsSpawned == true
+        netPiece.InitNetwork(team);           // safe to write Team.Value here
+        netPiece.CommitGridPos(row, col);     // safe to write Row/Col.Value here
+
+        if (!pieces.Contains(piece))
+            pieces.Add(piece);
     }
     #endregion
 
@@ -164,18 +323,83 @@ public class ChessBoard : MonoBehaviour
     public Piece GetPieceAt(int row, int col)
     {
         foreach (var p in pieces)
+        {
+            if (p == null || !p.gameObject.activeInHierarchy)
+                continue;
+
+            var np = p.GetComponent<NetworkPiece>();
+            if (np != null && np.IsCaptured.Value)
+                continue;
+
             if (p.Row == row && p.Col == col)
                 return p;
+        }
+
         return null;
     }
+
+    // Flip UI helpers
+    private const int BoardSize = 8;
+    //private bool IsWhitePerspective =>
+    //    NetworkManager.Singleton == null
+    //        ? true
+    //        : (NetworkManager.Singleton.IsHost            // host is white
+    //           || PlayerTeams.MyTeam == TeamSide.White);  // client white (spectator/local test)
+
+    private bool IsWhitePerspective
+    {
+        get
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null) return true;
+
+            // Host is white by design in your game
+            if (nm.IsHost) return true;
+
+            // On clients, ask PlayerTeams which side *this* local client owns
+            if (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned)
+            {
+                var myTeam = PlayerTeams.GetTeam(nm.LocalClientId);
+                return myTeam == TeamSide.White;
+            }
+
+            // If unknown momentarily, default to black so we don't mirror host
+            return false;
+        }
+    }
+
+
+    /** Convert model coords -> view coords depending on local perspective. */
+    private (int row, int col) ModelToView(int row, int col)
+    {
+        if (IsWhitePerspective) return (row, col);
+        int max = BoardSize - 1;
+        return (max - row, max - col); // 180° rotate for black
+    }
+
+    /** Convert view coords (what you clicked) -> model coords for logic. */
+    private (int row, int col) ViewToModel(int row, int col)
+    {
+        if (IsWhitePerspective) return (row, col);
+        int max = BoardSize - 1;
+        return (max - row, max - col);
+    }
+
+    // End of flip helpers
+
 
     /// <summary>
     /// Converts board coordinates to world-space position.
     /// </summary>
     public Vector3 GridToWorld(int row, int col)
     {
-        Vector3Int cellPos = new Vector3Int(col, row, 0);
+
+        var (vr, vc) = ModelToView(row, col);
+        Vector3Int cellPos = new Vector3Int(vc, vr, 0);
         return boardTilemap.GetCellCenterWorld(cellPos);
+
+        //Vector3Int cellPos = new Vector3Int(col, row, 0);
+        //return boardTilemap.GetCellCenterWorld(cellPos);
     }
 
     /// <summary>
@@ -184,7 +408,8 @@ public class ChessBoard : MonoBehaviour
     private void HideCapturedPiece(Piece piece)
     {
         pieces.Remove(piece);
-        piece.gameObject.SetActive(false);
+        //piece.gameObject.SetActive(false);
+        // Visuals are handled by NetworkPiece.IsCaptured -> ApplyCapturedState
     }
 
     /// <summary>
@@ -204,9 +429,30 @@ public class ChessBoard : MonoBehaviour
     private void SelectPiece(int row, int col)
     {
         var p = GetPieceAt(row, col);
-        if (p != null && p.Team == controller.IsWhiteTurn)
 
+        if (p == null)
+        {
+            infoPiece = null;
+            return;
+        }
+
+        var np = p.GetComponent<NetworkPiece>();
+        if (np && np.IsCaptured.Value) return;
+
+        var nm = NetworkManager.Singleton;
+        var myTeam = (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned)
+            ? PlayerTeams.GetTeam(nm.LocalClientId)
+            : TeamSide.Black; // safe default
+
+        bool myTeamIsWhite = (myTeam == TeamSide.White);
+
+
+        bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
+
+        if (p != null && p.Team == myTeamIsWhite && isMyTurn)
+        {
             selectedPiece = p;
+        }
 
         infoPiece = p;
     }
@@ -218,8 +464,38 @@ public class ChessBoard : MonoBehaviour
     {
         if (selectedPiece == null) return;
 
-        // The controller decides legality, capture, duels, en‑passant, castling, promotion...
-        controller.TryMove(selectedPiece, destRow, destCol);
+        var nm = NetworkManager.Singleton;
+        var myTeam = (PlayerTeams.Instance != null && PlayerTeams.Instance.IsSpawned)
+            ? PlayerTeams.GetTeam(nm.LocalClientId)
+            : TeamSide.Black; // safe default
+
+        bool myTeamIsWhite = (myTeam == TeamSide.White);
+
+
+        bool isMyTurn = (myTeamIsWhite == TurnSync.IsWhiteTurn);
+        if (!isMyTurn) return;
+
+        if (NetworkManager.Singleton.IsHost)
+        {
+            // The controller decides legality, capture, duels, en‑passant, castling, promotion...
+            // Host executes directly
+            controller.TryMove(selectedPiece, destRow, destCol);
+        }
+        else
+        {
+            //client asks politely => host validates and broadcasts
+            //but so far the host ignores me hard
+            if (_moveRelay == null)
+            {
+                _moveRelay = FindObjectOfType<MoveRelay>();
+                if (_moveRelay == null)
+                {
+                    Debug.LogError("[ChessBoard] No MoveRelay found!!!");
+                }
+            }
+            _moveRelay.SendMove(selectedPiece, destRow, destCol);
+            //GetComponent<MoveRelay>().SendMove(selectedPiece, destRow, destCol);
+        }
 
         selectedPiece = null;
         infoPiece = null;
@@ -248,18 +524,47 @@ public class ChessBoard : MonoBehaviour
     }
     #endregion
 
+
     #region UI
     private void OnUltimateButtonClicked()
     {
         Debug.Log("[UI] Ultimate button clicked!");
-        if (selectedPiece != null)
+        if (selectedPiece == null)
+        {
+            Debug.Log("[UI] selectedPiece is null");
+            return;
+        }
+
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.IsServer)
         {
             Debug.Log($"[UI] selectedPiece = {selectedPiece.Name} – calling UseUltimateAbility");
             selectedPiece.UseUltimateAbility(controller);
         }
         else
         {
-            Debug.Log("[UI] selectedPiece is null");
+            // Client asks the host
+            if (_moveRelay == null) _moveRelay = FindObjectOfType<MoveRelay>();
+            if (_moveRelay == null)
+            {
+                Debug.LogError("[UI] No MoveRelay found for ultimate!");
+                return;
+            }
+
+            var netObj = selectedPiece.GetComponent<NetworkObject>();
+            //_moveRelay.RequestUltimateServerRpc(netObj.NetworkObjectId);
+
+            // If this is a rook and we’re a client, start the client-side picker flow
+            if (selectedPiece is Rook && !NetworkManager.Singleton.IsServer)
+            {
+                _moveRelay.StartRookUltimateServerRpc(netObj.NetworkObjectId);
+            }
+            else
+            {
+                // existing path, cuz for Knight, King and Bishop that one works
+                _moveRelay.RequestUltimateServerRpc(netObj.NetworkObjectId);
+            }
+
         }
     }
 
@@ -270,22 +575,68 @@ public class ChessBoard : MonoBehaviour
     {
         if (infoPiece != null)
         {
-            infoPanel.SetActive(true);
             infoNameText.text = infoPiece.Name;
             infoTeamText.text = infoPiece.Team ? "Team: White" : "Team: Black";
-            infoLevelText.text = "Level: " + infoPiece.Level.ToString();
+            infoLevelText.text = "Lvl: " + infoPiece.Level.ToString();
+            infoStunnedText.text = $"Stun: {infoPiece.StunnedTurns} turn{(infoPiece.StunnedTurns == 1 ? "" : "s")}";
+            infoCursedText.text = $"Cursed: {infoPiece.CursedTurns} turn{(infoPiece.CursedTurns == 1 ? "" : "s")}";
+
             infoSpriteImage.sprite = infoPiece.GetComponent<SpriteRenderer>().sprite;
         }
-        else
-            infoPanel.SetActive(false);
 
         ultimateButton.gameObject.SetActive(selectedPiece != null && selectedPiece.CanUseUltimate());
     }
+
+    /// <summary>
+    /// Updates the info panel, but used in NetworkPiece so that the client sees the changes too.
+    /// </summary>
+    public void RefreshInfoIf(Piece p)
+    {
+        if (infoPiece == p)
+            UpdateUI();
+    }
+
+
+    // --- Turn label wiring ---
+    private void RefreshTurnLabel()
+    {
+        if (infoTurnText == null) return;
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null || TurnSync.Instance == null || PlayerTeams.Instance == null || !PlayerTeams.Instance.IsSpawned)
+        {
+            infoTurnText.text = "Waiting…";
+            return;
+        }
+
+        var myTeam = PlayerTeams.GetTeam(nm.LocalClientId);
+        if (myTeam == TeamSide.None)
+        {
+            infoTurnText.text = "Waiting for seat…";
+            return;
+        }
+
+        bool whiteTurn = TurnSync.Instance.WhiteTurn.Value;
+        bool myWhite = (myTeam == TeamSide.White);
+        bool myTurn = (myWhite == whiteTurn);
+
+        // Show both “who’s turn” and “can I move”
+        string who = whiteTurn ? "White" : "Black";
+        infoTurnText.text = myTurn ? $"Your turn ({who})" : $"Opponent’s turn ({who})";
+    }
+
+    private void OnWhiteTurnChanged(bool _, bool __) => RefreshTurnLabel();
+
+
+
+
+
+
     #endregion
 
     #region Event Methods
     // Event methods are called automatically when the given event raises
-    private void ApplyMoveVisuals(MoveResult m)
+    public void ApplyMoveVisuals(MoveResult m)
     {
         if (m.FromRow < 0)
         {
@@ -311,7 +662,7 @@ public class ChessBoard : MonoBehaviour
         UpdateUI();
     }
 
-    private void ShowRoll(int value)
+    public void ShowRoll(int value)
     {
         rollText.text = $"Rolled: {value}";
     }
@@ -367,6 +718,11 @@ public class ChessBoard : MonoBehaviour
                 onChosen?.Invoke(null);          // signal cancel
             }
         };
+    }
+
+    public void SetMoveRelay(MoveRelay relay)
+    {
+        _moveRelay = relay;
     }
 
 }

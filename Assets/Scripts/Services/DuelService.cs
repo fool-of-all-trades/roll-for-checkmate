@@ -35,11 +35,15 @@ public class DuelService : MonoBehaviour, IDuelService
         Debug.Log("Rook bonus: " + rookBonus);
         Debug.Log("Curse penalty: " + cursePenalty);
         Debug.Log("Knight bonus: " + knightBonus);
-        Debug.Log("Effective roll: " + effective);
 
         int threshold = 5 + defender.Level - attacker.Level;
 
-        bool win = effective > threshold;
+        bool win = effective >= threshold;
+
+        Debug.Log("Effective: " + effective);
+        Debug.Log("Threshold: " + threshold);
+        Debug.Log("Does the attacker win: " + win);
+
         return new DuelResult(win, rawRoll, effective);
     }
 

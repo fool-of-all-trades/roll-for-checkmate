@@ -23,25 +23,26 @@ namespace Abilities
 
             if (owner.StunnedTurns > 0)
             {
-                Debug.Log("Rook is stunned and cannot use abilities.");
+                Debug.Log("Bishop is stunned and cannot use abilities.");
                 return;
             }
 
+            bool success = false;
             int roll = Dice.Roll(20);
 
             if (roll <= 3)
             {
                 // Low roll: resurrect an opponent pawn
-                bool success = controller.ResurrectPawn(!owner.Team);
+                success = controller.ResurrectPawn(!owner.Team);
                 if (success)
                     Debug.Log("Ultimate ability: Wskrzesi³eœ przeciwnika, gratulacje");
                 else
                     Debug.Log("Ultimate ability: Coœ posz³o nie tak");
             }
-            else if (roll <= 17)
+            else if (roll <= 16)
             {
                 // Success: resurrect own pawn
-                bool success = controller.ResurrectPawn(owner.Team);
+                success = controller.ResurrectPawn(owner.Team);
                 if (success)
                     Debug.Log("Ultimate ability: Nice, uda³o siê wskrzesiæ");
                 else
@@ -50,7 +51,7 @@ namespace Abilities
             else if (roll <= 19)
             {
                 // High roll: bonus resurrection
-                bool success = controller.ResurrectPiece(owner.Team);
+                success = controller.ResurrectPiece(owner.Team);
                 if (success)
                     Debug.Log("Ultimate ability: No way, uda³o siê wskrzesiæ i to jeszcze co");
                 else
@@ -60,7 +61,7 @@ namespace Abilities
             {
                 // Nat 20: resurrect a legendary piece (with some crazy ass ability)
                 // For now only in plans
-                bool success = controller.ResurrectPiece(owner.Team);
+                success = controller.ResurrectPiece(owner.Team);
                 if (success)
                     Debug.Log("Ultimate ability: No way, uda³o siê wskrzesiæ i to jeszcze co");
                 else
@@ -68,7 +69,8 @@ namespace Abilities
             }
 
             // Mark the ultimate as used
-            usedUltimate = true;
+            if(success)
+                usedUltimate = true;
         }
     }
 }

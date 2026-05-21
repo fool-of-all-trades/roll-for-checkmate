@@ -77,6 +77,7 @@ Boss nr 1: Setup i przygotowanie projektu
 ✅  Z jakiegoś powodu pionki wciąż mogą jakimś cudem mieć level 6 mimo iż 5 powiniem być max
 🔲  Naprawić że po tym jak król umiera nie ma game over (jak zestrzeli go wieżyczka XD)
 🔲  Pomyśleć co zrobić z promocją pionków (pionki robią się bezużyteczne jak teraz dochodzą do końca, więc zeskakują z planszy i pozwalają dodać +1 level do dowolnej figury gracza)
+🔲  Umiejętność króla w sumie jest na ten moment trochę bezużyteczna z niektórymi pionkami, trzeba ją lekko zmodyfikować by odsuwać je tak by nie miały czystej drogi powrotu do króla
 🔲  2 Audio Listenery są no bo każda ze scen ma kamerę i każda z kamer listener, Unity to przeszkadza (ale jak zrobi się przechodzenie między scenami to powinno się to samo naprawić)
 
 1.9 Gra działa?
@@ -96,11 +97,25 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 ✅  GameController
 
 2.3  Implementacja multiplayera
-🔲  Wybrać rozwiązanie (Photon PUN2 / Mirror + Steam P2P / UGS) -> prawdopodobnie UGS
-🔲  Zainstalować pakiet i skonfigurować
-🔲  Stworzyć NetworkManager.cs z metodami Host()/Join()
-🔲  Dodać NetworkedPiece.cs (RPC Move, SyncVar Team/Position)
-🔲  Test: dwa klienty w edytorze łączą się i synchronizują ruch
+✅  Wybrać rozwiązanie (Photon PUN2 / Mirror + Steam P2P / UGS) -> prawdopodobnie UGS (ma do 50 concurrent players za darmo a potem pay as you go, więc jak będzie 51 to wyjdzie bardzo tanio. Natomiast PUN2 ma tylko 20 concurrent players a potem od razu 95$ na rok jak przekroczysz. Mirror+steam jest za darmo ale to nie będzie miało lobby, więc tylko znajomi i tylko na steam mogliby grać, fishnet czy coś istnieje ale do tego potrzebowałybyśmy osobnego serwera, ogółem na teraz myślę że UGS to najlepsza opcja)
+✅  Zainstalować transport, netcode.gameobjects
+✅  Test: dwa klienty w edytorze łączą się i synchronizują ruch
+✅  Test: dwa klienty w edytorze zjadają się
+✅  Test: dwa klienty w edytorze mogą levelować
+✅  Test: dwa klienty w edytorze nie mają tam gdzie nie sięga słońce kostki
+✅  Test: dwa klienty w edytorze mogą dostawać bonusy do kostek
+✅  Test: dwa klienty w edytorze mogą zostać odepchnięte przez króla
+✅  Test: dwa klienty mogą się połączyć nie używając edytora, dodaj UI
+✅  Test: dwa klienty w edytorze widzą swoje pionki na dole
+✅  Test: dwa klienty widzą jaki był wynik rzutu kostką
+✅  Test: dwa klienty w edytorze reagują na świętą ścieżkę bishopa
+✅  Test: dwa klienty w edytorze mogą zostać przeklnięte przez królową
+✅  Test: dwa klienty w edytorze mogą zostać wskrzeszone przez papieża
+✅  Test: dwa klienty w edytorze mogą zostać divine smitowane przez konika
+✅  Test: dwa klienty w edytorze mogą zostać zestrzelone przez wieżę
+✅  Zainstalować relay, authentication, lobby
+✅  Test: można utworzyć grę i dołączyć do niej po kodzie, logowanie anonimowe
+🔲  Test: dwa klienty w edytorze widzą animacje
 
 2.4  Animacje
 🔲  Mini duszek królowej unoszący się koło przeklętego pionka?
@@ -125,10 +140,10 @@ Boss nr 2: Dodanie multiplayer i animacji i modów
 🔲  
 
 2.7  UI i ustawienia
-🔲  Turn Indicator – pokazuje, czy ruch ma białe, czy czarne
+✅  Turn Indicator – pokazuje, czy ruch ma białe, czy czarne
 🔲  Move Log – lista ruchów (e4, Nf6 etc.), możliwość przewinięcia
 🔲  Timer / zegar
-🔲  Game Over Screen – wynik (mat, poddanie, remis), przyciski „Restart” / „Exit to Menu”
+🔲  Game Over Screen – wynik (mat, poddanie, remis), przyciski "Restart" / "Exit to Menu"
 🔲  Suwaki głośności (efekty, muzyka)
 🔲  Opcja wyłączenia animacji
 🔲  Zasada 50 posunięć
@@ -151,4 +166,5 @@ Boss nr 3: Marketing i publikacja
 
 3.2 Publikacja demo
 🔲  Na itch.io?
+🔲  Na steam?
 🔲  
