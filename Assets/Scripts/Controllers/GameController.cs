@@ -218,7 +218,15 @@ namespace Controller
 
             // TODO: promotion UI / replacement here
 
-            sacredRoad.ProcessMove(piece);
+            var context = new MoveCommitContext(
+                piece,
+                fromRow,
+                fromCol,
+                toRow,
+                toCol,
+                captured);
+
+            ProcessPostMoveEffects(context);
 
             AdvanceTurn();
 
@@ -229,6 +237,37 @@ namespace Controller
             }
 
             return true;
+        }
+
+        private readonly struct MoveCommitContext
+        {
+            public MoveCommitContext(
+                Piece mover,
+                int fromRow,
+                int fromCol,
+                int toRow,
+                int toCol,
+                Piece capturedPiece)
+            {
+                Mover = mover;
+                FromRow = fromRow;
+                FromCol = fromCol;
+                ToRow = toRow;
+                ToCol = toCol;
+                CapturedPiece = capturedPiece;
+            }
+
+            public Piece Mover { get; }
+            public int FromRow { get; }
+            public int FromCol { get; }
+            public int ToRow { get; }
+            public int ToCol { get; }
+            public Piece CapturedPiece { get; }
+        }
+
+        private void ProcessPostMoveEffects(MoveCommitContext context)
+        {
+            sacredRoad.ProcessMove(context.Mover);
         }
 
         void AdvanceTurn()
