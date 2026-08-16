@@ -551,29 +551,17 @@ public class MoveRelay : NetworkBehaviour
 
         if (targetId == 0) return; // canceled
 
-        if (!(rookPiece is Rook)) return;
-        if (!rookPiece.CanUseUltimate()) return;
-        if (rookPiece.StunnedTurns > 0) return;
-
         var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
         if (!spawns.TryGetValue(targetId, out var targetObj)) return;
         if (!targetObj.IsSpawned) return;
 
         var target = targetObj.GetComponent<Piece>();
-        var tnp = targetObj.GetComponent<NetworkPiece>();
-        if (!target || !tnp || tnp.IsCaptured.Value) return;
+        if (!target) return;
 
-        var legalTargetIds = GetRookUltimateTargetIds(rookPiece);
-        if (!legalTargetIds.Contains(targetId)) return;
+        var controller = _controller != null ? _controller : GameControllerMono.Instance;
+        if (controller == null) return;
 
-        // Apply replicated effects
-        tnp.IsCaptured.Value = true;                 // hide / disable everywhere
-        GameControllerMono.Instance.CapturePiece(target, rookPiece); // XP, curses, etc.
-
-        // Make the new level visible immediately to all clients (optional but nice)
-        var rnp = rookPiece.GetComponent<NetworkPiece>();
-        if (rnp != null) rnp.Level.Value = rookPiece.Level;
-        rookPiece.SetUltimateUsed(true);
+        controller.TryUseRookUltimate(rookPiece, target);
     }
 
 

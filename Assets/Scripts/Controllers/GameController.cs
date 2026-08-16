@@ -273,6 +273,67 @@ namespace Controller
             return true;
         }
 
+        public bool TryUseRookUltimate(Piece rookPiece, Piece target)
+        {
+            if (rookPiece == null || target == null) return false;
+            if (pieces == null || !pieces.Contains(rookPiece) || !pieces.Contains(target)) return false;
+            if (!(rookPiece is Rook)) return false;
+            if (rookPiece.Team != turnMgr.WhiteTurn) return false;
+            if (!rookPiece.CanUseUltimate()) return false;
+            if (rookPiece.StunnedTurns > 0) return false;
+            if (target.Team == rookPiece.Team) return false;
+
+            var targetNetworkPiece = target.GetComponent<NetworkPiece>();
+            if (!targetNetworkPiece || targetNetworkPiece.IsCaptured.Value) return false;
+            if (!IsLegalRookUltimateTarget(rookPiece, target)) return false;
+
+            targetNetworkPiece.IsCaptured.Value = true;
+            CapturePiece(target, rookPiece);
+
+            var rookNetworkPiece = rookPiece.GetComponent<NetworkPiece>();
+            if (rookNetworkPiece != null) rookNetworkPiece.Level.Value = rookPiece.Level;
+            rookPiece.SetUltimateUsed(true);
+            return true;
+        }
+
+        private bool IsLegalRookUltimateTarget(Piece rookPiece, Piece target)
+        {
+            int r0 = rookPiece.Row, c0 = rookPiece.Col;
+            var dirs = new (int dr, int dc)[] { (1, 0), (-1, 0), (0, 1), (0, -1) };
+
+            foreach (var (dr, dc) in dirs)
+            {
+                bool skipped = false;
+                int r = r0, c = c0;
+
+                while (true)
+                {
+                    r += dr;
+                    c += dc;
+                    if (r < 0 || r > 7 || c < 0 || c > 7) break;
+
+                    var piece = PieceAt(r, c);
+                    if (piece == null) continue;
+
+                    var np = piece.GetComponent<NetworkPiece>();
+                    if (np != null && np.IsCaptured.Value) continue;
+
+                    if (!skipped)
+                    {
+                        skipped = true;
+                    }
+                    else
+                    {
+                        if (piece == target && piece.Team != rookPiece.Team)
+                            return true;
+                        break;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private readonly struct MoveCommitContext
         {
             public MoveCommitContext(
