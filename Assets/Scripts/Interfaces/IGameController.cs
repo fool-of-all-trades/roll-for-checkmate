@@ -20,6 +20,8 @@ public interface IGameController
 
     bool TryMove(Piece piece, int toRow, int toCol);
 
+    bool TryUseUltimate(Piece piece);
+
     bool TryRelocate(Piece piece, int toRow, int toCol);
 
     Piece PieceAt(int row, int col);

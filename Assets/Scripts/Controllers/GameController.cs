@@ -239,6 +239,18 @@ namespace Controller
             return true;
         }
 
+        public bool TryUseUltimate(Piece piece)
+        {
+            if (piece == null) return false;
+            if (pieces == null || !pieces.Contains(piece)) return false;
+            if (piece.Team != turnMgr.WhiteTurn) return false;
+            if (!piece.CanUseUltimate()) return false;
+            if (piece.StunnedTurns > 0) return false;
+
+            piece.UseUltimateAbility(this);
+            return true;
+        }
+
         private readonly struct MoveCommitContext
         {
             public MoveCommitContext(

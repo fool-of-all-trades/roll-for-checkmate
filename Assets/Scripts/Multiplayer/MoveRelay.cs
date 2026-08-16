@@ -379,7 +379,7 @@ public class MoveRelay : NetworkBehaviour
         if (controller == null) return;
 
         // Host executes the ultimate
-        piece.UseUltimateAbility(controller);
+        controller.TryUseUltimate(piece);
     }
 
 

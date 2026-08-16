@@ -17,8 +17,8 @@ public partial class ChessBoard
         var nm = NetworkManager.Singleton;
         if (nm != null && nm.IsServer)
         {
-            Debug.Log($"[UI] selectedPiece = {selectedPiece.Name} “ calling UseUltimateAbility");
-            selectedPiece.UseUltimateAbility(controller);
+            Debug.Log($"[UI] selectedPiece = {selectedPiece.Name} “ calling TryUseUltimate");
+            controller.TryUseUltimate(selectedPiece);
         }
         else
         {
