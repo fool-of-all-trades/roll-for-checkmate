@@ -22,6 +22,8 @@ public interface IGameController
 
     bool TryUseUltimate(Piece piece);
 
+    bool TryUseKnightUltimate(Piece knightPiece, Piece target);
+
     bool TryRelocate(Piece piece, int toRow, int toCol);
 
     Piece PieceAt(int row, int col);

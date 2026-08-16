@@ -530,27 +530,17 @@ public class MoveRelay : NetworkBehaviour
         if (!TryValidatePieceCommand(knightId, rpcParams, out var knightPiece, out _, out _))
             return;
 
-        if (!(knightPiece is Knight)) return;
-        if (!knightPiece.CanUseUltimate()) return;
-        if (knightPiece.StunnedTurns > 0) return;
-
         var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
         if (!spawns.TryGetValue(targetId, out var targetObj)) return;
         if (!targetObj.IsSpawned) return;
 
         var target = targetObj.GetComponent<Piece>();
-        var np = targetObj.GetComponent<NetworkPiece>();
-        if (!target || !np || target.Team == knightPiece.Team || np.IsCaptured.Value) return;
+        if (!target) return;
 
-        var legalTargetIds = GetKnightUltimateTargetIds(knightPiece);
-        if (!legalTargetIds.Contains(targetId)) return;
+        var controller = _controller != null ? _controller : GameControllerMono.Instance;
+        if (controller == null) return;
 
-        np.Level.Value = 1;
-        np.StunnedTurns.Value = Mathf.Max(np.StunnedTurns.Value, 2);
-
-        target.UpdateLevel(1 - target.Level);
-        target.SetStunnedTurns(2);
-        knightPiece.SetUltimateUsed(true);
+        controller.TryUseKnightUltimate(knightPiece, target);
     }
 
     [ServerRpc(RequireOwnership = false)]

@@ -251,6 +251,28 @@ namespace Controller
             return true;
         }
 
+        public bool TryUseKnightUltimate(Piece knightPiece, Piece target)
+        {
+            if (knightPiece == null || target == null) return false;
+            if (pieces == null || !pieces.Contains(knightPiece) || !pieces.Contains(target)) return false;
+            if (!(knightPiece is Knight)) return false;
+            if (knightPiece.Team != turnMgr.WhiteTurn) return false;
+            if (!knightPiece.CanUseUltimate()) return false;
+            if (knightPiece.StunnedTurns > 0) return false;
+            if (target.Team == knightPiece.Team) return false;
+
+            var np = target.GetComponent<NetworkPiece>();
+            if (!np || np.IsCaptured.Value) return false;
+
+            np.Level.Value = 1;
+            np.StunnedTurns.Value = Mathf.Max(np.StunnedTurns.Value, 2);
+
+            target.UpdateLevel(1 - target.Level);
+            target.SetStunnedTurns(2);
+            knightPiece.SetUltimateUsed(true);
+            return true;
+        }
+
         private readonly struct MoveCommitContext
         {
             public MoveCommitContext(
