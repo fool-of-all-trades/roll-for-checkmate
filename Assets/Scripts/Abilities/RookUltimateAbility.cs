@@ -57,32 +57,8 @@ namespace Abilities
                         return;
                     }
 
-                    // Ignore already-captured targets (race safety)
-                    var tnp = target.GetComponent<NetworkPiece>();
-                    if (tnp == null)
-                    {
-                        Debug.LogError("[RookUltimate] Target has no NetworkPiece.");
-                        return;
-                    }
-                    if (tnp.IsCaptured.Value)
-                    {
-                        Debug.Log("[RookUltimate] Target already captured.");
-                        return;
-                    }
-
-                    // Replicate capture to everyone
-                    tnp.IsCaptured.Value = true;
-
-                    // Level/curse/etc. handled here
-                    controller.CapturePiece(target, owner); // XP + hide prefab
-
-                    // (Optional) push owner level so clients see the XP gain instantly
-                    var onp = owner.GetComponent<NetworkPiece>();
-                    if (onp != null)
-                        onp.Level.Value = owner.Level;
-
-                    Debug.Log($"Rook sniped {target.Name} at ({target.Row},{target.Col})");
-                    usedUltimate = true;
+                    if (controller.TryUseRookUltimate(owner, target))
+                        Debug.Log($"Rook sniped {target.Name} at ({target.Row},{target.Col})");
                 }
             );
         }

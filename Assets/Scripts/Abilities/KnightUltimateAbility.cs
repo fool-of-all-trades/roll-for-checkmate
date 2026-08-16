@@ -61,31 +61,8 @@ namespace Abilities
                         return;
                     }
 
-                    var np = target.GetComponent<NetworkPiece>();
-                    if (np == null)
-                    {
-                        Debug.LogError("[KnightUltimate] Target has no NetworkPiece.");
-                        return;
-                    }
-                    if (np.IsCaptured.Value)
-                    {
-                        Debug.Log("[KnightUltimate] Target already captured.");
-                        return;
-                    }
-
-                    // --- Apply effects via replicated NetworkVariables ---
-                    np.Level.Value = 1;                                       // drops to level 1 for everyone
-                    np.StunnedTurns.Value = Mathf.Max(np.StunnedTurns.Value, 2); // 2 half-moves = 1 full turn
-
-                    // update locally
-                    target.UpdateLevel(1 - target.Level);
-                    target.SetStunnedTurns(2);
-
-                    usedUltimate = true; // local flag (host-side). Button visibility on clients is handled by selection/UI.
-
-                    Debug.Log($"Knight DIVINE SMITES the shit out of {target.Name}!");
-
-                    // TODO: fire an event so UI can flash the target square
+                    if (controller.TryUseKnightUltimate(owner, target))
+                        Debug.Log($"Knight DIVINE SMITES the shit out of {target.Name}!");
                 })
             );
         }
