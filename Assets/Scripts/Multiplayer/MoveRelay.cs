@@ -16,6 +16,20 @@ public class MoveRelay : NetworkBehaviour
     private GameControllerMono _controller;
     private bool _isBroadcaster;
 
+    private readonly struct CommandSenderContext
+    {
+        public CommandSenderContext(ulong senderClientId, TeamSide senderTeam, bool isWhiteTurn)
+        {
+            SenderClientId = senderClientId;
+            SenderTeam = senderTeam;
+            IsWhiteTurn = isWhiteTurn;
+        }
+
+        public ulong SenderClientId { get; }
+        public TeamSide SenderTeam { get; }
+        public bool IsWhiteTurn { get; }
+    }
+
     // Client -> Host 
     [ServerRpc(RequireOwnership = false)]
     public void RequestMoveServerRpc(ulong pieceId, int toRow, int toCol, ServerRpcParams rpcParams = default)
@@ -67,39 +81,12 @@ public class MoveRelay : NetworkBehaviour
         senderTeam = TeamSide.None;
         failureReason = null;
 
-        if (!IsServer)
-        {
-            failureReason = "Not running on server.";
+        if (!TryValidateCommandSender(senderClientId, out var context, out failureReason))
             return false;
-        }
+
+        senderTeam = context.SenderTeam;
 
         var networkManager = NetworkManager.Singleton;
-        if (networkManager == null)
-        {
-            failureReason = "NetworkManager is missing.";
-            return false;
-        }
-
-        var teams = PlayerTeams.Instance;
-        if (!teams)
-        {
-            failureReason = "PlayerTeams is missing.";
-            return false;
-        }
-
-        senderTeam = PlayerTeams.GetTeam(senderClientId);
-        if (senderTeam == TeamSide.None)
-        {
-            failureReason = "Sender has no team.";
-            return false;
-        }
-
-        bool whiteTurn = TurnSync.Instance && TurnSync.Instance.WhiteTurn.Value;
-        if ((senderTeam == TeamSide.White) != whiteTurn)
-        {
-            failureReason = "Not sender team's turn.";
-            return false;
-        }
 
         var spawns = networkManager.SpawnManager.SpawnedObjects;
         if (!spawns.TryGetValue(pieceId, out var netObj))
@@ -130,6 +117,69 @@ public class MoveRelay : NetworkBehaviour
             return false;
         }
 
+        return true;
+    }
+
+    private bool TryValidateCommandSender(
+        ServerRpcParams rpcParams,
+        out CommandSenderContext context,
+        out string failureReason)
+    {
+        return TryValidateCommandSender(
+            rpcParams.Receive.SenderClientId,
+            out context,
+            out failureReason);
+    }
+
+    private bool TryValidateCommandSender(
+        ulong senderClientId,
+        out CommandSenderContext context,
+        out string failureReason)
+    {
+        context = default;
+        failureReason = null;
+
+        if (!IsServer)
+        {
+            failureReason = "Not running on server.";
+            return false;
+        }
+
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager == null)
+        {
+            failureReason = "NetworkManager is missing.";
+            return false;
+        }
+
+        var teams = PlayerTeams.Instance;
+        if (!teams || !teams.IsSpawned)
+        {
+            failureReason = "PlayerTeams is missing.";
+            return false;
+        }
+
+        var senderTeam = PlayerTeams.GetTeam(senderClientId);
+        if (senderTeam == TeamSide.None)
+        {
+            failureReason = "Sender has no team.";
+            return false;
+        }
+
+        if (!TurnSync.Instance)
+        {
+            failureReason = "TurnSync is missing.";
+            return false;
+        }
+
+        bool whiteTurn = TurnSync.Instance.WhiteTurn.Value;
+        if ((senderTeam == TeamSide.White) != whiteTurn)
+        {
+            failureReason = "Not sender team's turn.";
+            return false;
+        }
+
+        context = new CommandSenderContext(senderClientId, senderTeam, whiteTurn);
         return true;
     }
 
