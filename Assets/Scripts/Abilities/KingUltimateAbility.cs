@@ -26,7 +26,6 @@ namespace Abilities
                 return;
             }
 
-            ChessBoard board = owner.board;
             int kr = owner.Row;
             int kc = owner.Col;
 
@@ -49,7 +48,7 @@ namespace Abilities
                 if (enemyRow < 0 || enemyRow >= 8 || enemyCol < 0 || enemyCol >= 8)
                     continue;
 
-                Piece target = board.GetPieceAt(enemyRow, enemyCol);
+                Piece target = controller.PieceAt(enemyRow, enemyCol);
                 if (target != null && target.Team != owner.Team)
                 {
                     var targetNetworkPiece = target.GetComponent<NetworkPiece>();
