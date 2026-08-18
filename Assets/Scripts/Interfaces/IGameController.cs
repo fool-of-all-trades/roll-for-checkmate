@@ -26,6 +26,8 @@ public interface IGameController
 
     bool TryUseRookUltimate(Piece rookPiece, Piece target);
 
+    bool TryAscendPawn(Pawn pawn, Piece beneficiary);
+
     bool TryRelocate(Piece piece, int toRow, int toCol);
 
     Piece PieceAt(int row, int col);

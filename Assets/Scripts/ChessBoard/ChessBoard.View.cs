@@ -16,7 +16,7 @@ public partial class ChessBoard
                 continue;
 
             var np = p.GetComponent<NetworkPiece>();
-            if (np != null && np.IsCaptured.Value)
+            if (np != null && (np.IsCaptured.Value || np.IsAscended.Value))
                 continue;
 
             if (p.Row == row && p.Col == col)
@@ -88,7 +88,7 @@ public partial class ChessBoard
     {
         pieces.Remove(piece);
         //piece.gameObject.SetActive(false);
-        // Visuals are handled by NetworkPiece.IsCaptured -> ApplyCapturedState
+        // Visuals are handled by NetworkPiece's replicated out-of-play state.
     }
 
     /// <summary>

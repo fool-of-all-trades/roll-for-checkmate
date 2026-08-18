@@ -37,10 +37,10 @@ public class MoveRelay : NetworkBehaviour
         if (!TryValidatePieceCommand(pieceId, rpcParams, out var piece, out _, out _))
             return;
 
-        TryExecuteMoveCommand(piece, toRow, toCol);
+        TryExecuteMoveCommand(piece, toRow, toCol, rpcParams.Receive.SenderClientId);
     }
 
-    private void TryExecuteMoveCommand(Piece piece, int toRow, int toCol)
+    private void TryExecuteMoveCommand(Piece piece, int toRow, int toCol, ulong senderClientId)
     {
         if (piece == null) return;
 
@@ -49,10 +49,14 @@ public class MoveRelay : NetworkBehaviour
         if (target)
         {
             var tnp = target.GetComponent<NetworkPiece>();
-            if (tnp && tnp.IsCaptured.Value) return;
+            if (tnp && (tnp.IsCaptured.Value || tnp.IsAscended.Value)) return;
         }
 
-        GameControllerMono.Instance?.TryMove(piece, toRow, toCol);
+        var controller = GameControllerMono.Instance;
+        if (controller == null || !controller.TryMove(piece, toRow, toCol)) return;
+
+        if (piece is Pawn pawn)
+            TrySendPawnAscensionSelection(controller, pawn, senderClientId);
     }
 
     private bool TryValidatePieceCommand(
@@ -103,9 +107,9 @@ public class MoveRelay : NetworkBehaviour
         }
 
         var np = netObj.GetComponent<NetworkPiece>();
-        if (np && np.IsCaptured.Value)
+        if (np && (np.IsCaptured.Value || np.IsAscended.Value))
         {
-            failureReason = "Piece is captured.";
+            failureReason = "Piece is out of play.";
             return false;
         }
 
@@ -322,7 +326,7 @@ public class MoveRelay : NetworkBehaviour
                     out _))
                 return;
 
-            TryExecuteMoveCommand(validatedPiece, toRow, toCol);
+            TryExecuteMoveCommand(validatedPiece, toRow, toCol, networkManager.LocalClientId);
         }
         else
         {
@@ -382,12 +386,103 @@ public class MoveRelay : NetworkBehaviour
         controller.TryUseUltimate(piece);
     }
 
+    private void TrySendPawnAscensionSelection(
+        GameControllerMono controller,
+        Pawn pawn,
+        ulong targetClientId)
+    {
+        var beneficiaries = controller.GetPendingAscensionBeneficiaries(pawn);
+        if (beneficiaries.Count == 0) return;
+
+        var ids = new List<ulong>();
+        foreach (var beneficiary in beneficiaries)
+        {
+            var networkObject = beneficiary.GetComponent<NetworkObject>();
+            if (networkObject != null && networkObject.IsSpawned)
+                ids.Add(networkObject.NetworkObjectId);
+        }
+
+        if (ids.Count == 0) return;
+
+        var pawnNetworkObject = pawn.GetComponent<NetworkObject>();
+        if (pawnNetworkObject == null || !pawnNetworkObject.IsSpawned) return;
+
+        var sendParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { targetClientId } }
+        };
+        ChoosePawnAscensionBeneficiaryClientRpc(
+            pawnNetworkObject.NetworkObjectId,
+            ids.ToArray(),
+            sendParams);
+    }
+
+    [ClientRpc]
+    private void ChoosePawnAscensionBeneficiaryClientRpc(
+        ulong pawnId,
+        ulong[] beneficiaryIds,
+        ClientRpcParams _ = default)
+    {
+        var networkManager = NetworkManager.Singleton;
+        var board = FindObjectOfType<ChessBoard>();
+        if (networkManager == null || board == null) return;
+
+        var beneficiaries = new List<Piece>();
+        foreach (var id in beneficiaryIds)
+        {
+            if (networkManager.SpawnManager.SpawnedObjects.TryGetValue(id, out var obj))
+            {
+                var beneficiary = obj.GetComponent<Piece>();
+                if (beneficiary != null)
+                    beneficiaries.Add(beneficiary);
+            }
+        }
+
+        board.BeginMandatoryTargetSelection(beneficiaries, chosen =>
+        {
+            if (chosen == null) return;
+
+            var chosenObject = chosen.GetComponent<NetworkObject>();
+            if (chosenObject != null)
+                SubmitPawnAscensionBeneficiaryServerRpc(pawnId, chosenObject.NetworkObjectId);
+        });
+        board.ShowPawnAscensionPrompt();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SubmitPawnAscensionBeneficiaryServerRpc(
+        ulong pawnId,
+        ulong beneficiaryId,
+        ServerRpcParams rpcParams = default)
+    {
+        if (!TryValidatePieceCommand(pawnId, rpcParams, out var pawnPiece, out _, out _))
+            return;
+        if (!(pawnPiece is Pawn pawn)) return;
+
+        var controller = _controller != null ? _controller : GameControllerMono.Instance;
+        if (controller == null) return;
+
+        var spawns = NetworkManager.Singleton.SpawnManager.SpawnedObjects;
+        if (!spawns.TryGetValue(beneficiaryId, out var beneficiaryObject) ||
+            !beneficiaryObject.IsSpawned)
+        {
+            TrySendPawnAscensionSelection(controller, pawn, rpcParams.Receive.SenderClientId);
+            return;
+        }
+
+        var beneficiary = beneficiaryObject.GetComponent<Piece>();
+        if (beneficiary == null || !controller.TryAscendPawn(pawn, beneficiary))
+            TrySendPawnAscensionSelection(controller, pawn, rpcParams.Receive.SenderClientId);
+    }
+
 
     // trying by all means to make the tower work, I'll change it in the future I swear
     // === Rook Ultimate: client picks target, server applies ===
     [ServerRpc(RequireOwnership = false)]
     public void StartRookUltimateServerRpc(ulong rookId, ServerRpcParams rpcParams = default)
     {
+        if (GameControllerMono.Instance?.HasPendingPawnAscension == true) return;
+
         var sender = rpcParams.Receive.SenderClientId;
         if (!TryValidatePieceCommand(rookId, rpcParams, out var rookPiece, out _, out _))
             return;
@@ -464,6 +559,8 @@ public class MoveRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void StartKnightUltimateServerRpc(ulong knightId, ServerRpcParams rpcParams = default)
     {
+        if (GameControllerMono.Instance?.HasPendingPawnAscension == true) return;
+
         var sender = rpcParams.Receive.SenderClientId;
         if (!TryValidatePieceCommand(knightId, rpcParams, out var knightPiece, out _, out _))
             return;
@@ -495,7 +592,7 @@ public class MoveRelay : NetworkBehaviour
             if (piece == null || piece.Team == knightPiece.Team) continue;
 
             var np = netObj.GetComponent<NetworkPiece>();
-            if (np == null || np.IsCaptured.Value) continue;
+            if (np == null || np.IsCaptured.Value || np.IsAscended.Value) continue;
 
             ids.Add(netObj.NetworkObjectId);
         }

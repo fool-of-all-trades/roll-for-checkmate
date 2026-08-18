@@ -31,6 +31,11 @@ public class NetworkPiece : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    public NetworkVariable<bool> IsAscended = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     public NetworkVariable<int> Level = new(1,
         NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
@@ -57,6 +62,7 @@ public class NetworkPiece : NetworkBehaviour
         Row.OnValueChanged -= OnCoordsChanged;
         Col.OnValueChanged -= OnCoordsChanged;
         IsCaptured.OnValueChanged -= OnCapturedChanged;
+        IsAscended.OnValueChanged -= OnAscendedChanged;
     }
 
     public override void OnNetworkSpawn()
@@ -87,6 +93,7 @@ public class NetworkPiece : NetworkBehaviour
         Row.OnValueChanged += OnCoordsChanged;
         Col.OnValueChanged += OnCoordsChanged;
         IsCaptured.OnValueChanged += OnCapturedChanged;
+        IsAscended.OnValueChanged += OnAscendedChanged;
         Level.OnValueChanged += OnLevelChanged;
         Team.OnValueChanged += (_, now) => piece.ChangeTeam(now);
 
@@ -104,7 +111,7 @@ public class NetworkPiece : NetworkBehaviour
 
         // apply initial states for late joiners
         piece.SetViewPosition(Row.Value, Col.Value);
-        ApplyCapturedState(IsCaptured.Value);
+        ApplyOutOfPlayState();
     }
 
     private void SeedNetworkFromPiece()
@@ -115,6 +122,7 @@ public class NetworkPiece : NetworkBehaviour
         Row.Value = piece.Row;
         Col.Value = piece.Col;
         IsCaptured.Value = false;               // or your actual captured state
+        IsAscended.Value = false;
         StunnedTurns.Value = piece.StunnedTurns;
         CursedTurns.Value = piece.CursedTurns;
     }
@@ -127,6 +135,7 @@ public class NetworkPiece : NetworkBehaviour
         Level.OnValueChanged -= OnLevelChanged;
         Team.OnValueChanged -= (_, __) => { };
         IsCaptured.OnValueChanged -= OnCapturedChanged;
+        IsAscended.OnValueChanged -= OnAscendedChanged;
         StunnedTurns.OnValueChanged -= (_, now) => { };
         CursedTurns.OnValueChanged -= (_, now) => { };
     }
@@ -155,7 +164,12 @@ public class NetworkPiece : NetworkBehaviour
     // fired when IsCaptured changes
     private void OnCapturedChanged(bool _, bool now)
     {
-        ApplyCapturedState(now);
+        ApplyOutOfPlayState();
+    }
+
+    private void OnAscendedChanged(bool _, bool now)
+    {
+        ApplyOutOfPlayState();
     }
 
     private void OnLevelChanged(int prev, int now)
@@ -163,19 +177,20 @@ public class NetworkPiece : NetworkBehaviour
         ApplyLevel(now);
     }
 
-    // centralize how "captured" looks/behaves
-    private void ApplyCapturedState(bool captured)
+    // centralize how captured or permanently retired pieces look/behave
+    private void ApplyOutOfPlayState()
     {
-        SyncBoardMembership(captured);
+        bool outOfPlay = IsCaptured.Value || IsAscended.Value;
+        SyncBoardMembership(outOfPlay);
 
         // disable selection/clicks
-        if (_col) _col.enabled = !captured;
+        if (_col) _col.enabled = !outOfPlay;
 
         // hide from board by default (or route to a "graveyard" UI if you want)
-        if (_sr) _sr.enabled = !captured;
+        if (_sr) _sr.enabled = !outOfPlay;
     }
 
-    private void SyncBoardMembership(bool captured)
+    private void SyncBoardMembership(bool outOfPlay)
     {
         if (piece == null) return;
 
@@ -188,7 +203,7 @@ public class NetworkPiece : NetworkBehaviour
 
         if (board == null) return;
 
-        if (captured)
+        if (outOfPlay)
         {
             board.pieces.Remove(piece);
             return;

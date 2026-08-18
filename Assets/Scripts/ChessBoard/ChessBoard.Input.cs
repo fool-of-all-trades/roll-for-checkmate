@@ -131,7 +131,7 @@ public partial class ChessBoard
         if (piece == null) return false;
 
         var np = piece.GetComponent<NetworkPiece>();
-        if (np && np.IsCaptured.Value) return false;
+        if (np && (np.IsCaptured.Value || np.IsAscended.Value)) return false;
 
         if (!TryGetLocalTeam(out var localTeam)) return false;
         if (!IsLocalPlayersTurn(localTeam)) return false;

@@ -13,6 +13,9 @@ namespace Controller
     public class GameControllerMono : NetworkBehaviour, IGameController
     {
         List<Piece> pieces;
+        private Pawn _pendingAscensionPawn;
+
+        public bool HasPendingPawnAscension => _pendingAscensionPawn != null;
 
         /// <summary>
         /// Called once by ChessBoard in Awake to give us the live piece list.
@@ -20,6 +23,7 @@ namespace Controller
         public void Initialize(IEnumerable<Piece> allPieces)
         {
             pieces = new List<Piece>(allPieces);
+            _pendingAscensionPawn = null;
         }
 
         /* ───────────── GameController event contracts ───────────── */
@@ -88,6 +92,8 @@ namespace Controller
         /// <returns>True if moved, false if move not possible</returns>
         public bool TryMove(Piece piece, int toRow, int toCol)
         {
+            if (_pendingAscensionPawn != null) return false;
+
             if (!validator.IsLegalMove(piece, toRow, toCol, out var info))
                 return false;
 
@@ -228,6 +234,9 @@ namespace Controller
 
             ProcessPostMoveEffects(context);
 
+            if (_pendingAscensionPawn != null)
+                return true;
+
             AdvanceTurn();
 
             if (IsGameOver(piece))
@@ -241,6 +250,7 @@ namespace Controller
 
         public bool TryUseUltimate(Piece piece)
         {
+            if (_pendingAscensionPawn != null) return false;
             if (piece == null) return false;
             if (pieces == null || !pieces.Contains(piece)) return false;
             if (piece.Team != turnMgr.WhiteTurn) return false;
@@ -253,6 +263,7 @@ namespace Controller
 
         public bool TryUseKnightUltimate(Piece knightPiece, Piece target)
         {
+            if (_pendingAscensionPawn != null) return false;
             if (knightPiece == null || target == null) return false;
             if (pieces == null || !pieces.Contains(knightPiece) || !pieces.Contains(target)) return false;
             if (!(knightPiece is Knight)) return false;
@@ -275,6 +286,7 @@ namespace Controller
 
         public bool TryUseRookUltimate(Piece rookPiece, Piece target)
         {
+            if (_pendingAscensionPawn != null) return false;
             if (rookPiece == null || target == null) return false;
             if (pieces == null || !pieces.Contains(rookPiece) || !pieces.Contains(target)) return false;
             if (!(rookPiece is Rook)) return false;
@@ -293,6 +305,47 @@ namespace Controller
             var rookNetworkPiece = rookPiece.GetComponent<NetworkPiece>();
             if (rookNetworkPiece != null) rookNetworkPiece.Level.Value = rookPiece.Level;
             rookPiece.SetUltimateUsed(true);
+            return true;
+        }
+
+        public IReadOnlyList<Piece> GetPendingAscensionBeneficiaries(Pawn pawn)
+        {
+            if (pawn == null || pawn != _pendingAscensionPawn || pieces == null)
+                return Array.Empty<Piece>();
+
+            return pieces
+                .Where(candidate => IsValidAscensionBeneficiary(pawn, candidate))
+                .ToList();
+        }
+
+        public bool TryAscendPawn(Pawn pawn, Piece beneficiary)
+        {
+            if (_pendingAscensionPawn == null || pawn != _pendingAscensionPawn) return false;
+            if (pawn == null || beneficiary == null || pieces == null) return false;
+            if (!pieces.Contains(pawn) || !pieces.Contains(beneficiary)) return false;
+            if (!pawn.gameObject.activeInHierarchy) return false;
+            if (pawn.Team != turnMgr.WhiteTurn) return false;
+            if (!IsPawnOnOpponentBackRank(pawn)) return false;
+            if (!IsValidAscensionBeneficiary(pawn, beneficiary)) return false;
+
+            var pawnNetworkPiece = pawn.GetComponent<NetworkPiece>();
+            var beneficiaryNetworkPiece = beneficiary.GetComponent<NetworkPiece>();
+            if (!pawnNetworkPiece || !pawnNetworkPiece.IsSpawned ||
+                pawnNetworkPiece.IsCaptured.Value || pawnNetworkPiece.IsAscended.Value)
+                return false;
+            if (!beneficiaryNetworkPiece || !beneficiaryNetworkPiece.IsSpawned)
+                return false;
+
+            int reward = pawn.Level <= 2 ? 1 : pawn.Level <= 4 ? 2 : 3;
+            int newLevel = Mathf.Min(5, beneficiary.Level + reward);
+            beneficiary.UpdateLevel(newLevel - beneficiary.Level);
+            beneficiaryNetworkPiece.Level.Value = beneficiary.Level;
+
+            RetireAscendedPawn(pawn, pawnNetworkPiece);
+            _pendingAscensionPawn = null;
+
+            AdvanceTurn();
+            IsGameOver(pawn);
             return true;
         }
 
@@ -363,6 +416,50 @@ namespace Controller
         private void ProcessPostMoveEffects(MoveCommitContext context)
         {
             sacredRoad.ProcessMove(context.Mover);
+            TryBeginPawnAscension(context.Mover);
+        }
+
+        private void TryBeginPawnAscension(Piece mover)
+        {
+            if (!(mover is Pawn pawn) || !IsPawnOnOpponentBackRank(pawn))
+                return;
+            if (pieces == null || !pieces.Contains(pawn))
+                return;
+
+            var pawnNetworkPiece = pawn.GetComponent<NetworkPiece>();
+            if (!pawnNetworkPiece || !pawnNetworkPiece.IsSpawned ||
+                pawnNetworkPiece.IsCaptured.Value || pawnNetworkPiece.IsAscended.Value)
+                return;
+
+            _pendingAscensionPawn = pawn;
+            if (GetPendingAscensionBeneficiaries(pawn).Count > 0)
+                return;
+
+            Debug.LogWarning("Pawn Ascension has no legal beneficiary; retiring the Pawn without a level reward.");
+            RetireAscendedPawn(pawn, pawnNetworkPiece);
+            _pendingAscensionPawn = null;
+        }
+
+        private bool IsValidAscensionBeneficiary(Pawn pawn, Piece beneficiary)
+        {
+            if (beneficiary == null || beneficiary == pawn) return false;
+            if (!pieces.Contains(beneficiary) || !beneficiary.gameObject.activeInHierarchy) return false;
+            if (beneficiary.Team != pawn.Team) return false;
+
+            var networkPiece = beneficiary.GetComponent<NetworkPiece>();
+            return networkPiece != null && networkPiece.IsSpawned &&
+                   !networkPiece.IsCaptured.Value && !networkPiece.IsAscended.Value;
+        }
+
+        private static bool IsPawnOnOpponentBackRank(Pawn pawn)
+        {
+            return pawn.Team ? pawn.Row == 7 : pawn.Row == 0;
+        }
+
+        private void RetireAscendedPawn(Pawn pawn, NetworkPiece networkPiece)
+        {
+            networkPiece.IsAscended.Value = true;
+            pieces.Remove(pawn);
         }
 
         void AdvanceTurn()

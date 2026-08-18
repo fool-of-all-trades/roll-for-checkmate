@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Pieces;
 using Unity.Netcode;
 using UnityEngine;
@@ -45,6 +46,13 @@ public class ChessBoardStartupCoordinator
             yield return null;
         }
 
-        onReady?.Invoke(new List<Piece>(UnityEngine.Object.FindObjectsOfType<Piece>()));
+        var activePieces = UnityEngine.Object.FindObjectsOfType<Piece>()
+            .Where(piece =>
+            {
+                var networkPiece = piece.GetComponent<NetworkPiece>();
+                return networkPiece == null ||
+                       (!networkPiece.IsCaptured.Value && !networkPiece.IsAscended.Value);
+            });
+        onReady?.Invoke(new List<Piece>(activePieces));
     }
 }

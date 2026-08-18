@@ -88,6 +88,12 @@ public partial class ChessBoard
         infoTurnText.text = myTurn ? $"Your turn ({who})" : $"Opponent's turn ({who})";
     }
 
+    public void ShowPawnAscensionPrompt()
+    {
+        if (infoTurnText != null)
+            infoTurnText.text = "Choose who to bless";
+    }
+
     public void ShowRoll(int value)
     {
         rollText.text = $"Rolled: {value}";
