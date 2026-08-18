@@ -16,6 +16,7 @@ namespace Controller
         private Pawn _pendingAscensionPawn;
 
         public bool HasPendingPawnAscension => _pendingAscensionPawn != null;
+        public Pawn PendingAscensionPawn => _pendingAscensionPawn;
 
         /// <summary>
         /// Called once by ChessBoard in Awake to give us the live piece list.

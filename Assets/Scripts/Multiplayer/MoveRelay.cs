@@ -15,6 +15,8 @@ public class MoveRelay : NetworkBehaviour
 
     private GameControllerMono _controller;
     private bool _isBroadcaster;
+    private bool _ascensionResumeSubscribed;
+    private ulong? _lastResumedAscensionPawnId;
 
     private readonly struct CommandSenderContext
     {
@@ -239,6 +241,8 @@ public class MoveRelay : NetworkBehaviour
         if (IsServer)
         {
             TryRegisterAsBroadcaster();
+            RegisterAscensionResume();
+            TryResumePendingAscensionForOwner();
         }
 
         // Important: only the owning client should hook its board to THIS relay
@@ -268,6 +272,62 @@ public class MoveRelay : NetworkBehaviour
         Debug.Log($"[MoveRelay] Registered broadcaster ID={NetworkObjectId}");
     }
 
+    private void RegisterAscensionResume()
+    {
+        if (_ascensionResumeSubscribed) return;
+
+        var networkManager = NetworkManager;
+        if (networkManager == null || OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId) return;
+
+        PlayerTeams.TeamsChanged += OnTeamsChanged;
+        _ascensionResumeSubscribed = true;
+    }
+
+    private void UnregisterAscensionResume()
+    {
+        if (!_ascensionResumeSubscribed) return;
+
+        PlayerTeams.TeamsChanged -= OnTeamsChanged;
+        _ascensionResumeSubscribed = false;
+    }
+
+    private void OnTeamsChanged()
+    {
+        TryResumePendingAscensionForOwner();
+    }
+
+    private void TryResumePendingAscensionForOwner()
+    {
+        if (!IsServer || !IsSpawned) return;
+
+        var networkManager = NetworkManager;
+        if (networkManager == null || OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId) return;
+
+        var controller = _controller != null ? _controller : GameControllerMono.Instance;
+        if (controller == null) return;
+
+        var pawn = controller.PendingAscensionPawn;
+        if (pawn == null)
+        {
+            _lastResumedAscensionPawnId = null;
+            return;
+        }
+
+        var ownerTeam = PlayerTeams.GetTeam(OwnerClientId);
+        if (ownerTeam == TeamSide.None) return;
+
+        bool ownerIsWhite = ownerTeam == TeamSide.White;
+        if (ownerIsWhite != pawn.Team) return;
+
+        var pawnNetworkObject = pawn.GetComponent<NetworkObject>();
+        if (pawnNetworkObject == null || !pawnNetworkObject.IsSpawned) return;
+        if (_lastResumedAscensionPawnId == pawnNetworkObject.NetworkObjectId) return;
+        if (controller.GetPendingAscensionBeneficiaries(pawn).Count == 0) return;
+
+        TrySendPawnAscensionSelection(controller, pawn, OwnerClientId);
+        _lastResumedAscensionPawnId = pawnNetworkObject.NetworkObjectId;
+    }
+
     private void OnMoveAccepted(MoveResult m)
     {
         // figure out the IDs
@@ -287,6 +347,8 @@ public class MoveRelay : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        UnregisterAscensionResume();
+
         if (_isBroadcaster && _controller != null)
         {
             _controller.OnMoveAccepted -= OnMoveAccepted;
