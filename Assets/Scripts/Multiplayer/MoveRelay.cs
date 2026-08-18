@@ -42,6 +42,17 @@ public class MoveRelay : NetworkBehaviour
         TryExecuteMoveCommand(piece, toRow, toCol, rpcParams.Receive.SenderClientId);
     }
 
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestDeclineAscensionMoveServerRpc(
+        ulong pieceId,
+        ServerRpcParams rpcParams = default)
+    {
+        if (!TryValidatePieceCommand(pieceId, rpcParams, out var piece, out _, out _))
+            return;
+
+        TryExecuteDeclineAscensionMoveCommand(piece);
+    }
+
     private void TryExecuteMoveCommand(Piece piece, int toRow, int toCol, ulong senderClientId)
     {
         if (piece == null) return;
@@ -59,6 +70,17 @@ public class MoveRelay : NetworkBehaviour
 
         if (piece is Pawn pawn)
             TrySendPawnAscensionSelection(controller, pawn, senderClientId);
+
+        if (controller.PendingAscensionMovePiece == piece)
+            TrySendAscensionMovePrompt(piece, senderClientId);
+    }
+
+    private void TryExecuteDeclineAscensionMoveCommand(Piece piece)
+    {
+        var controller = _controller != null ? _controller : GameControllerMono.Instance;
+        if (controller == null) return;
+
+        controller.TryDeclineAscensionMove(piece);
     }
 
     private bool TryValidatePieceCommand(
@@ -398,6 +420,34 @@ public class MoveRelay : NetworkBehaviour
         Debug.Log($"[MoveRelay] Sending move of {piece.name} -> {toRow},{toCol}");
     }
 
+    public void SendDeclineAscensionMove(Piece piece)
+    {
+        if (!_ready || piece == null) return;
+
+        var netObj = piece.GetComponent<NetworkObject>();
+        if (netObj == null || !netObj.IsSpawned) return;
+
+        if (IsServer)
+        {
+            var networkManager = NetworkManager.Singleton;
+            if (networkManager == null) return;
+
+            if (!TryValidatePieceCommand(
+                    netObj.NetworkObjectId,
+                    networkManager.LocalClientId,
+                    out var validatedPiece,
+                    out _,
+                    out _))
+                return;
+
+            TryExecuteDeclineAscensionMoveCommand(validatedPiece);
+        }
+        else
+        {
+            RequestDeclineAscensionMoveServerRpc(netObj.NetworkObjectId);
+        }
+    }
+
     public void SendUltimate(Piece piece)
     {
         if (piece == null) return;
@@ -511,6 +561,35 @@ public class MoveRelay : NetworkBehaviour
         board.ShowPawnAscensionPrompt();
     }
 
+    private void TrySendAscensionMovePrompt(Piece piece, ulong targetClientId)
+    {
+        var networkObject = piece.GetComponent<NetworkObject>();
+        if (networkObject == null || !networkObject.IsSpawned) return;
+
+        var sendParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { targetClientId } }
+        };
+        BeginAscensionMoveClientRpc(networkObject.NetworkObjectId, sendParams);
+    }
+
+    [ClientRpc]
+    private void BeginAscensionMoveClientRpc(
+        ulong pieceId,
+        ClientRpcParams _ = default)
+    {
+        var networkManager = NetworkManager.Singleton;
+        var board = FindObjectOfType<ChessBoard>();
+        if (networkManager == null || board == null) return;
+
+        if (!networkManager.SpawnManager.SpawnedObjects.TryGetValue(pieceId, out var networkObject))
+            return;
+
+        var piece = networkObject.GetComponent<Piece>();
+        if (piece != null)
+            board.BeginAscensionMove(piece);
+    }
+
     [ServerRpc(RequireOwnership = false)]
     private void SubmitPawnAscensionBeneficiaryServerRpc(
         ulong pawnId,
@@ -543,7 +622,8 @@ public class MoveRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void StartRookUltimateServerRpc(ulong rookId, ServerRpcParams rpcParams = default)
     {
-        if (GameControllerMono.Instance?.HasPendingPawnAscension == true) return;
+        if (GameControllerMono.Instance?.HasPendingPawnAscension == true ||
+            GameControllerMono.Instance?.PendingAscensionMovePiece != null) return;
 
         var sender = rpcParams.Receive.SenderClientId;
         if (!TryValidatePieceCommand(rookId, rpcParams, out var rookPiece, out _, out _))
@@ -621,7 +701,8 @@ public class MoveRelay : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void StartKnightUltimateServerRpc(ulong knightId, ServerRpcParams rpcParams = default)
     {
-        if (GameControllerMono.Instance?.HasPendingPawnAscension == true) return;
+        if (GameControllerMono.Instance?.HasPendingPawnAscension == true ||
+            GameControllerMono.Instance?.PendingAscensionMovePiece != null) return;
 
         var sender = rpcParams.Receive.SenderClientId;
         if (!TryValidatePieceCommand(knightId, rpcParams, out var knightPiece, out _, out _))

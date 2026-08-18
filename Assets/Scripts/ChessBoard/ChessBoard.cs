@@ -52,7 +52,8 @@ public partial class ChessBoard : NetworkBehaviour
     private enum BoardInputMode
     {
         Normal,
-        TargetSelection
+        TargetSelection,
+        AscensionMove
     }
 
     private BoardInputMode _inputMode = BoardInputMode.Normal;
@@ -139,6 +140,7 @@ public partial class ChessBoard : NetworkBehaviour
 
         // local list points to destroyed objects after shutdown; clear it
         pieces.Clear();
+        ExitAscensionMoveMode();
         selectedPiece = null;
         infoPiece = null;
         ExitTargetSelection();
@@ -302,7 +304,11 @@ public partial class ChessBoard : NetworkBehaviour
     }
     #endregion
 
-    private void OnWhiteTurnChanged(bool _, bool __) => RefreshTurnLabel();
+    private void OnWhiteTurnChanged(bool _, bool __)
+    {
+        ExitAscensionMoveMode();
+        RefreshTurnLabel();
+    }
 
     public void SetMoveRelay(MoveRelay relay)
     {

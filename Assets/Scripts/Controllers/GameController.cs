@@ -14,9 +14,11 @@ namespace Controller
     {
         List<Piece> pieces;
         private Pawn _pendingAscensionPawn;
+        private Piece _pendingAscensionMovePiece;
 
         public bool HasPendingPawnAscension => _pendingAscensionPawn != null;
         public Pawn PendingAscensionPawn => _pendingAscensionPawn;
+        public Piece PendingAscensionMovePiece => _pendingAscensionMovePiece;
 
         /// <summary>
         /// Called once by ChessBoard in Awake to give us the live piece list.
@@ -25,6 +27,7 @@ namespace Controller
         {
             pieces = new List<Piece>(allPieces);
             _pendingAscensionPawn = null;
+            _pendingAscensionMovePiece = null;
         }
 
         /* ───────────── GameController event contracts ───────────── */
@@ -95,8 +98,15 @@ namespace Controller
         {
             if (_pendingAscensionPawn != null) return false;
 
+            bool isResolvingAscensionMove = _pendingAscensionMovePiece != null;
+            if (isResolvingAscensionMove && piece != _pendingAscensionMovePiece)
+                return false;
+
             if (!validator.IsLegalMove(piece, toRow, toCol, out var info))
                 return false;
+
+            if (isResolvingAscensionMove)
+                _pendingAscensionMovePiece = null;
 
             int fromRow = piece.Row;
             int fromCol = piece.Col;
@@ -238,6 +248,18 @@ namespace Controller
             if (_pendingAscensionPawn != null)
                 return true;
 
+            if (!isResolvingAscensionMove && piece.HasAscensionMove)
+            {
+                ClearAscensionMove(piece);
+
+                bool gameOverBeforeBonus = HasNoLegalMoves(!turnMgr.WhiteTurn);
+                if (!gameOverBeforeBonus && HasAnyLegalMove(piece))
+                {
+                    _pendingAscensionMovePiece = piece;
+                    return true;
+                }
+            }
+
             AdvanceTurn();
 
             if (IsGameOver(piece))
@@ -251,7 +273,7 @@ namespace Controller
 
         public bool TryUseUltimate(Piece piece)
         {
-            if (_pendingAscensionPawn != null) return false;
+            if (_pendingAscensionPawn != null || _pendingAscensionMovePiece != null) return false;
             if (piece == null) return false;
             if (pieces == null || !pieces.Contains(piece)) return false;
             if (piece.Team != turnMgr.WhiteTurn) return false;
@@ -264,7 +286,7 @@ namespace Controller
 
         public bool TryUseKnightUltimate(Piece knightPiece, Piece target)
         {
-            if (_pendingAscensionPawn != null) return false;
+            if (_pendingAscensionPawn != null || _pendingAscensionMovePiece != null) return false;
             if (knightPiece == null || target == null) return false;
             if (pieces == null || !pieces.Contains(knightPiece) || !pieces.Contains(target)) return false;
             if (!(knightPiece is Knight)) return false;
@@ -287,7 +309,7 @@ namespace Controller
 
         public bool TryUseRookUltimate(Piece rookPiece, Piece target)
         {
-            if (_pendingAscensionPawn != null) return false;
+            if (_pendingAscensionPawn != null || _pendingAscensionMovePiece != null) return false;
             if (rookPiece == null || target == null) return false;
             if (pieces == null || !pieces.Contains(rookPiece) || !pieces.Contains(target)) return false;
             if (!(rookPiece is Rook)) return false;
@@ -321,6 +343,7 @@ namespace Controller
 
         public bool TryAscendPawn(Pawn pawn, Piece beneficiary)
         {
+            if (_pendingAscensionMovePiece != null) return false;
             if (_pendingAscensionPawn == null || pawn != _pendingAscensionPawn) return false;
             if (pawn == null || beneficiary == null || pieces == null) return false;
             if (!pieces.Contains(pawn) || !pieces.Contains(beneficiary)) return false;
@@ -350,6 +373,27 @@ namespace Controller
 
             AdvanceTurn(beneficiary);
             IsGameOver(pawn);
+            return true;
+        }
+
+        public bool TryDeclineAscensionMove(Piece piece)
+        {
+            if (_pendingAscensionMovePiece == null || piece != _pendingAscensionMovePiece)
+                return false;
+            if (pieces == null || !pieces.Contains(piece) || !piece.gameObject.activeInHierarchy)
+                return false;
+            if (piece.Team != turnMgr.WhiteTurn)
+                return false;
+
+            var networkPiece = piece.GetComponent<NetworkPiece>();
+            if (networkPiece != null &&
+                (networkPiece.IsCaptured.Value || networkPiece.IsAscended.Value))
+                return false;
+
+            _pendingAscensionMovePiece = null;
+            ClearAscensionMove(piece);
+            AdvanceTurn();
+            IsGameOver(piece);
             return true;
         }
 
@@ -541,10 +585,23 @@ namespace Controller
         /// </summary>
         public bool IsGameOver(Piece lastMovedPiece)
         {
-            bool teamToMove = turnMgr.WhiteTurn;
+            return IsGameOverForTeam(turnMgr.WhiteTurn, lastMovedPiece);
+        }
+
+        private bool IsGameOverForTeam(bool teamToMove, Piece lastMovedPiece)
+        {
+            if (!HasNoLegalMoves(teamToMove))
+                return false;
+
             Piece king = GetKing(teamToMove);
 
-            foreach (var p in pieces.Where(x => x.Team == teamToMove))
+            Debug.Log(IsCheck(king, lastMovedPiece) ? "CheckMate!" : "StaleMate!");
+            return true;
+        }
+
+        private bool HasNoLegalMoves(bool team)
+        {
+            foreach (var p in pieces.Where(x => x.Team == team))
             {
                 for (int r = 0; r < 8; r++)
                     for (int c = 0; c < 8; c++)
@@ -552,8 +609,21 @@ namespace Controller
                             return false;
             }
 
-            Debug.Log(IsCheck(king, lastMovedPiece) ? "CheckMate!" : "StaleMate!");
             return true;
+        }
+
+        private bool HasAnyLegalMove(Piece piece)
+        {
+            for (int row = 0; row < 8; row++)
+            {
+                for (int col = 0; col < 8; col++)
+                {
+                    if (validator.IsLegalMove(piece, row, col, out _))
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

@@ -1,13 +1,26 @@
 using Pieces;
 using Pieces;
+using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 
 public partial class ChessBoard
 {
+    private TMP_Text _ultimateButtonLabel;
+    private string _ultimateButtonDefaultLabel;
+
     private void OnUltimateButtonClicked()
     {
         Debug.Log("[UI] Ultimate button clicked!");
+
+        if (IsAscensionMoveActive)
+        {
+            if (_ascensionMovePiece != null && TryGetMoveRelay(out var relay))
+                relay.SendDeclineAscensionMove(_ascensionMovePiece);
+
+            return;
+        }
+
         if (selectedPiece == null)
         {
             Debug.Log("[UI] selectedPiece is null");
@@ -48,7 +61,26 @@ public partial class ChessBoard
             infoSpriteImage.sprite = infoPiece.GetComponent<SpriteRenderer>().sprite;
         }
 
-        ultimateButton.gameObject.SetActive(selectedPiece != null && selectedPiece.CanUseUltimate());
+        UpdateUltimateButtonPresentation();
+    }
+
+    private void UpdateUltimateButtonPresentation()
+    {
+        if (_ultimateButtonLabel == null)
+        {
+            _ultimateButtonLabel = ultimateButton.GetComponentInChildren<TMP_Text>();
+            if (_ultimateButtonLabel != null)
+                _ultimateButtonDefaultLabel = _ultimateButtonLabel.text;
+        }
+
+        if (_ultimateButtonLabel != null)
+            _ultimateButtonLabel.text = IsAscensionMoveActive
+                ? "End Turn"
+                : _ultimateButtonDefaultLabel;
+
+        ultimateButton.gameObject.SetActive(
+            IsAscensionMoveActive ||
+            (selectedPiece != null && selectedPiece.CanUseUltimate()));
     }
 
     /// <summary>
@@ -92,6 +124,12 @@ public partial class ChessBoard
     {
         if (infoTurnText != null)
             infoTurnText.text = "Choose who to bless";
+    }
+
+    private void ShowAscensionMovePrompt()
+    {
+        if (infoTurnText != null)
+            infoTurnText.text = "Move again or end turn";
     }
 
     public void ShowRoll(int value)

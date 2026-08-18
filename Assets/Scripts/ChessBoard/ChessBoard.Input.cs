@@ -7,6 +7,9 @@ using UnityEngine.EventSystems;
 
 public partial class ChessBoard
 {
+    private Piece _ascensionMovePiece;
+    private bool IsAscensionMoveActive => _inputMode == BoardInputMode.AscensionMove;
+
     /// <summary>
     /// Detects clicks outside UI and routes to selection or move logic.
     /// </summary>
@@ -48,6 +51,17 @@ public partial class ChessBoard
                 CancelTargetSelection();
 
             return;   // ignore normal selection logic while targeting for DIVINE SMITE
+        }
+
+        if (IsAscensionMoveActive)
+        {
+            selectedPiece = _ascensionMovePiece;
+            infoPiece = _ascensionMovePiece;
+
+            if (clickedPiece != _ascensionMovePiece)
+                AttemptMove(row, col);
+
+            return;
         }
 
         if (selectedPiece == null)
@@ -106,8 +120,40 @@ public partial class ChessBoard
             // Fallback for non-networked/local play.
             controller.TryMove(selectedPiece, destRow, destCol);
         }
+        if (IsAscensionMoveActive)
+        {
+            selectedPiece = _ascensionMovePiece;
+            infoPiece = _ascensionMovePiece;
+        }
+        else
+        {
+            selectedPiece = null;
+            infoPiece = null;
+        }
+    }
+
+    public void BeginAscensionMove(Piece piece)
+    {
+        if (piece == null) return;
+
+        ExitTargetSelection();
+        _ascensionMovePiece = piece;
+        selectedPiece = piece;
+        infoPiece = piece;
+        _inputMode = BoardInputMode.AscensionMove;
+        ShowAscensionMovePrompt();
+        UpdateUI();
+    }
+
+    private void ExitAscensionMoveMode()
+    {
+        if (!IsAscensionMoveActive) return;
+
+        _inputMode = BoardInputMode.Normal;
+        _ascensionMovePiece = null;
         selectedPiece = null;
         infoPiece = null;
+        UpdateUI();
     }
 
     private bool TryGetLocalTeam(out TeamSide team)
