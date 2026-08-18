@@ -25,6 +25,7 @@ namespace Pieces
         protected int row, col;
         protected int cursedTurns;
         protected int stunnedTurns;
+        protected int ascensionMoveTurnsRemaining;
         protected bool hasMoved;
 
         private void Awake()
@@ -41,6 +42,8 @@ namespace Pieces
         public bool HasMoved { get => hasMoved; private set => hasMoved = value; }
         public string Name { get => pieceName; private set => pieceName = value; }
         public int StunnedTurns { get => stunnedTurns; private set => stunnedTurns = value; }
+        public int AscensionMoveTurnsRemaining { get => ascensionMoveTurnsRemaining; private set => ascensionMoveTurnsRemaining = value; }
+        public bool HasAscensionMove => AscensionMoveTurnsRemaining > 0;
         #endregion
 
         public void Init(ChessBoard boardCtx, int startRow, int startCol, bool team)
@@ -132,6 +135,24 @@ namespace Pieces
         {
             if (stunnedTurns > 0)
                 SetStunnedTurns(stunnedTurns - 1);
+        }
+
+        public void SetAscensionMoveTurnsRemaining(int turns, bool replicate = true)
+        {
+            ascensionMoveTurnsRemaining = Mathf.Max(0, turns);
+
+            if (replicate && NetworkManager.Singleton && NetworkManager.Singleton.IsServer)
+            {
+                var networkPiece = GetComponent<NetworkPiece>();
+                if (networkPiece)
+                    networkPiece.AscensionMoveTurnsRemaining.Value = ascensionMoveTurnsRemaining;
+            }
+        }
+
+        public void TickAscensionMoveTurn()
+        {
+            if (ascensionMoveTurnsRemaining > 0)
+                SetAscensionMoveTurnsRemaining(ascensionMoveTurnsRemaining - 1);
         }
 
         public bool IsStunned() => this != null && this.StunnedTurns > 0;

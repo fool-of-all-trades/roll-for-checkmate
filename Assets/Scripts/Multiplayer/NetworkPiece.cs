@@ -45,6 +45,9 @@ public class NetworkPiece : NetworkBehaviour
     public NetworkVariable<int> CursedTurns = new(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    public NetworkVariable<int> AscensionMoveTurnsRemaining = new(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private Piece piece;
     private Collider2D _col;
     private SpriteRenderer _sr;
@@ -63,6 +66,7 @@ public class NetworkPiece : NetworkBehaviour
         Col.OnValueChanged -= OnCoordsChanged;
         IsCaptured.OnValueChanged -= OnCapturedChanged;
         IsAscended.OnValueChanged -= OnAscendedChanged;
+        AscensionMoveTurnsRemaining.OnValueChanged -= OnAscensionMoveTurnsRemainingChanged;
     }
 
     public override void OnNetworkSpawn()
@@ -77,6 +81,7 @@ public class NetworkPiece : NetworkBehaviour
 
         piece.SetStunnedTurns(StunnedTurns.Value);
         piece.SetCursedTurns(CursedTurns.Value);
+        piece.SetAscensionMoveTurnsRemaining(AscensionMoveTurnsRemaining.Value, replicate: false);
 
         if (!piece.board)
             piece.board = FindObjectOfType<ChessBoard>();
@@ -94,6 +99,7 @@ public class NetworkPiece : NetworkBehaviour
         Col.OnValueChanged += OnCoordsChanged;
         IsCaptured.OnValueChanged += OnCapturedChanged;
         IsAscended.OnValueChanged += OnAscendedChanged;
+        AscensionMoveTurnsRemaining.OnValueChanged += OnAscensionMoveTurnsRemainingChanged;
         Level.OnValueChanged += OnLevelChanged;
         Team.OnValueChanged += (_, now) => piece.ChangeTeam(now);
 
@@ -125,6 +131,7 @@ public class NetworkPiece : NetworkBehaviour
         IsAscended.Value = false;
         StunnedTurns.Value = piece.StunnedTurns;
         CursedTurns.Value = piece.CursedTurns;
+        AscensionMoveTurnsRemaining.Value = piece.AscensionMoveTurnsRemaining;
     }
 
 
@@ -136,6 +143,7 @@ public class NetworkPiece : NetworkBehaviour
         Team.OnValueChanged -= (_, __) => { };
         IsCaptured.OnValueChanged -= OnCapturedChanged;
         IsAscended.OnValueChanged -= OnAscendedChanged;
+        AscensionMoveTurnsRemaining.OnValueChanged -= OnAscensionMoveTurnsRemainingChanged;
         StunnedTurns.OnValueChanged -= (_, now) => { };
         CursedTurns.OnValueChanged -= (_, now) => { };
     }
@@ -170,6 +178,11 @@ public class NetworkPiece : NetworkBehaviour
     private void OnAscendedChanged(bool _, bool now)
     {
         ApplyOutOfPlayState();
+    }
+
+    private void OnAscensionMoveTurnsRemainingChanged(int _, int now)
+    {
+        piece.SetAscensionMoveTurnsRemaining(now, replicate: false);
     }
 
     private void OnLevelChanged(int prev, int now)

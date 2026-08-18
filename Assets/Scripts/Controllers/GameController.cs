@@ -117,7 +117,7 @@ namespace Controller
                     if (!duelResult.AttackerWon)
                     {
                         // Attacker died, defender survives and levels up – turn ends here
-                        captureManager.CapturePiece(pieces, piece, target);
+                        CapturePieceAndClearAscensionMove(piece, target);
 
                         // After client reconnect they won't see ghosts of captured pieces
                         if (IsServer)
@@ -140,7 +140,7 @@ namespace Controller
                 }
 
                 // Auto-capture or attacker won duel
-                captureManager.CapturePiece(pieces, target, piece);       // attacker levels up
+                CapturePieceAndClearAscensionMove(target, piece);       // attacker levels up
                 captured = target;           // for MoveResult
 
                 // After client reconnect they won't see ghosts of captured pieces
@@ -173,7 +173,7 @@ namespace Controller
                     Piece victim = PieceAt(toRow - dir, toCol);
                     if (victim is Pawn && victim.Team != pawn.Team)
                     {
-                        captureManager.CapturePiece(pieces, victim, pawn);
+                        CapturePieceAndClearAscensionMove(victim, pawn);
                         captured = victim;           // include in MoveResult
 
                         // After client reconnect they won't see ghosts of captured pieces
@@ -342,10 +342,13 @@ namespace Controller
             beneficiary.UpdateLevel(newLevel - beneficiary.Level);
             beneficiaryNetworkPiece.Level.Value = beneficiary.Level;
 
+            if (!beneficiary.HasAscensionMove)
+                beneficiary.SetAscensionMoveTurnsRemaining(3);
+
             RetireAscendedPawn(pawn, pawnNetworkPiece);
             _pendingAscensionPawn = null;
 
-            AdvanceTurn();
+            AdvanceTurn(beneficiary);
             IsGameOver(pawn);
             return true;
         }
@@ -416,7 +419,11 @@ namespace Controller
 
         private void ProcessPostMoveEffects(MoveCommitContext context)
         {
+            bool teamBeforeSacredRoad = context.Mover.Team;
             sacredRoad.ProcessMove(context.Mover);
+            if (context.Mover.Team != teamBeforeSacredRoad)
+                ClearAscensionMove(context.Mover);
+
             TryBeginPawnAscension(context.Mover);
         }
 
@@ -459,16 +466,40 @@ namespace Controller
 
         private void RetireAscendedPawn(Pawn pawn, NetworkPiece networkPiece)
         {
+            ClearAscensionMove(pawn);
             networkPiece.IsAscended.Value = true;
             pieces.Remove(pawn);
         }
 
-        void AdvanceTurn()
+        void AdvanceTurn(Piece ascensionMoveExpiryExclusion = null)
         {
+            bool teamThatCompletedTurn = turnMgr.WhiteTurn;
             turnMgr.ToggleTurn();
             TurnSync.Instance?.CommitTurn(turnMgr.WhiteTurn);
             queensCurse.TickTurn();
             foreach (var p in pieces) p.TickStunnedTurns();
+            TickAscensionMoveTurns(teamThatCompletedTurn, ascensionMoveExpiryExclusion);
+        }
+
+        private void TickAscensionMoveTurns(bool team, Piece exclusion)
+        {
+            foreach (var piece in pieces)
+            {
+                if (piece != exclusion && piece.Team == team && piece.HasAscensionMove)
+                    piece.TickAscensionMoveTurn();
+            }
+        }
+
+        private static void ClearAscensionMove(Piece piece)
+        {
+            if (piece != null && piece.HasAscensionMove)
+                piece.SetAscensionMoveTurnsRemaining(0);
+        }
+
+        private void CapturePieceAndClearAscensionMove(Piece captured, Piece winner)
+        {
+            ClearAscensionMove(captured);
+            captureManager.CapturePiece(pieces, captured, winner);
         }
 
 
@@ -568,7 +599,7 @@ namespace Controller
 
         public void CapturePiece(Piece captured, Piece winner)
         {
-            captureManager.CapturePiece(pieces, captured, winner);
+            CapturePieceAndClearAscensionMove(captured, winner);
             if (captured is Queen)
             {
                 queensCurse.ApplyCurse(winner, 6);  // 6 half-moves = 3 full turns
