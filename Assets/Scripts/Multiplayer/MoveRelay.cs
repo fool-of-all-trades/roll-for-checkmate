@@ -69,6 +69,9 @@ public class MoveRelay : NetworkBehaviour
         var controller = GameControllerMono.Instance;
         if (controller == null || !controller.TryMove(piece, toRow, toCol)) return;
 
+        if (controller.PendingAscensionMovePiece == null)
+            _lastResumedAscensionMovePieceId = null;
+
         if (piece is Pawn pawn)
             TrySendPawnAscensionSelection(controller, pawn, senderClientId);
 
@@ -81,7 +84,8 @@ public class MoveRelay : NetworkBehaviour
         var controller = _controller != null ? _controller : GameControllerMono.Instance;
         if (controller == null) return;
 
-        controller.TryDeclineAscensionMove(piece);
+        if (controller.TryDeclineAscensionMove(piece))
+            _lastResumedAscensionMovePieceId = null;
     }
 
     private bool TryValidatePieceCommand(
@@ -340,29 +344,28 @@ public class MoveRelay : NetworkBehaviour
         var ownerTeam = PlayerTeams.GetTeam(OwnerClientId);
         if (ownerTeam == TeamSide.None) return;
 
-        if (pawn != null)
-        {
-            bool ownerIsWhite = ownerTeam == TeamSide.White;
-            if (ownerIsWhite == pawn.Team)
-            {
-                var pawnNetworkObject = pawn.GetComponent<NetworkObject>();
-                if (pawnNetworkObject != null && pawnNetworkObject.IsSpawned &&
-                    _lastResumedAscensionPawnId != pawnNetworkObject.NetworkObjectId &&
-                    controller.GetPendingAscensionBeneficiaries(pawn).Count > 0)
-                {
-                    TrySendPawnAscensionSelection(controller, pawn, OwnerClientId);
-                    _lastResumedAscensionPawnId = pawnNetworkObject.NetworkObjectId;
-                }
-            }
+        bool ownerIsWhite = ownerTeam == TeamSide.White;
 
-            return;
+        if (pawn != null && ownerIsWhite == pawn.Team)
+        {
+            var pawnNetworkObject = pawn.GetComponent<NetworkObject>();
+            if (pawnNetworkObject != null && pawnNetworkObject.IsSpawned &&
+                _lastResumedAscensionPawnId != pawnNetworkObject.NetworkObjectId &&
+                controller.GetPendingAscensionBeneficiaries(pawn).Count > 0)
+            {
+                TrySendPawnAscensionSelection(controller, pawn, OwnerClientId);
+                _lastResumedAscensionPawnId = pawnNetworkObject.NetworkObjectId;
+            }
         }
 
-        if (ascensionMovePiece == null) return;
+        if (pawn != null)
+            return;
 
-        bool moveOwnerIsWhite = ownerTeam == TeamSide.White;
-        if (moveOwnerIsWhite != ascensionMovePiece.Team) return;
-        if (!ascensionMovePiece.gameObject.activeInHierarchy) return;
+        if (ascensionMovePiece == null || ownerIsWhite != ascensionMovePiece.Team)
+            return;
+        if (!ascensionMovePiece.gameObject.activeInHierarchy ||
+            controller.PendingAscensionMovePiece != ascensionMovePiece)
+            return;
 
         var ascensionMoveNetworkObject = ascensionMovePiece.GetComponent<NetworkObject>();
         var ascensionMoveNetworkPiece = ascensionMovePiece.GetComponent<NetworkPiece>();
@@ -370,8 +373,8 @@ public class MoveRelay : NetworkBehaviour
             ascensionMoveNetworkPiece == null || ascensionMoveNetworkPiece.IsCaptured.Value ||
             ascensionMoveNetworkPiece.IsAscended.Value)
             return;
-        if (controller.PendingAscensionMovePiece != ascensionMovePiece) return;
-        if (_lastResumedAscensionMovePieceId == ascensionMoveNetworkObject.NetworkObjectId) return;
+        if (_lastResumedAscensionMovePieceId == ascensionMoveNetworkObject.NetworkObjectId)
+            return;
 
         TrySendAscensionMovePrompt(ascensionMovePiece, OwnerClientId);
         _lastResumedAscensionMovePieceId = ascensionMoveNetworkObject.NetworkObjectId;
