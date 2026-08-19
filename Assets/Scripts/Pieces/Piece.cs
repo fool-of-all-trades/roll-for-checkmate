@@ -108,7 +108,22 @@ namespace Pieces
                 spriteRenderer.sprite = team ? whiteSprite : blackSprite;
         }
 
-        public void MarkMoved() => hasMoved = true;
+        public void MarkMoved()
+        {
+            SetHasMoved(true);
+        }
+
+        public void SetHasMoved(bool moved, bool replicate = true)
+        {
+            hasMoved = moved;
+
+            if (replicate && NetworkManager.Singleton && NetworkManager.Singleton.IsServer)
+            {
+                var networkPiece = GetComponent<NetworkPiece>();
+                if (networkPiece)
+                    networkPiece.HasMoved.Value = moved;
+            }
+        }
 
         public void UpdateLevel(int delta) => level += delta;
 

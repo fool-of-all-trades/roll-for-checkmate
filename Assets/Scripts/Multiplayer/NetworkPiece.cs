@@ -51,6 +51,9 @@ public class NetworkPiece : NetworkBehaviour
     public NetworkVariable<bool> HasUsedUltimate = new(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    public NetworkVariable<bool> HasMoved = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private Piece piece;
     private Collider2D _col;
     private SpriteRenderer _sr;
@@ -71,6 +74,7 @@ public class NetworkPiece : NetworkBehaviour
         IsAscended.OnValueChanged -= OnAscendedChanged;
         AscensionMoveTurnsRemaining.OnValueChanged -= OnAscensionMoveTurnsRemainingChanged;
         HasUsedUltimate.OnValueChanged -= OnHasUsedUltimateChanged;
+        HasMoved.OnValueChanged -= OnHasMovedChanged;
     }
 
     public override void OnNetworkSpawn()
@@ -87,6 +91,7 @@ public class NetworkPiece : NetworkBehaviour
         piece.SetCursedTurns(CursedTurns.Value);
         piece.SetAscensionMoveTurnsRemaining(AscensionMoveTurnsRemaining.Value, replicate: false);
         piece.SetUltimateUsed(HasUsedUltimate.Value, replicate: false);
+        piece.SetHasMoved(HasMoved.Value, replicate: false);
 
         if (!piece.board)
             piece.board = FindObjectOfType<ChessBoard>();
@@ -106,6 +111,7 @@ public class NetworkPiece : NetworkBehaviour
         IsAscended.OnValueChanged += OnAscendedChanged;
         AscensionMoveTurnsRemaining.OnValueChanged += OnAscensionMoveTurnsRemainingChanged;
         HasUsedUltimate.OnValueChanged += OnHasUsedUltimateChanged;
+        HasMoved.OnValueChanged += OnHasMovedChanged;
         Level.OnValueChanged += OnLevelChanged;
         Team.OnValueChanged += (_, now) => piece.ChangeTeam(now);
 
@@ -139,6 +145,7 @@ public class NetworkPiece : NetworkBehaviour
         CursedTurns.Value = piece.CursedTurns;
         AscensionMoveTurnsRemaining.Value = piece.AscensionMoveTurnsRemaining;
         HasUsedUltimate.Value = piece.HasUsedUltimate();
+        HasMoved.Value = piece.HasMoved;
     }
 
 
@@ -152,6 +159,7 @@ public class NetworkPiece : NetworkBehaviour
         IsAscended.OnValueChanged -= OnAscendedChanged;
         AscensionMoveTurnsRemaining.OnValueChanged -= OnAscensionMoveTurnsRemainingChanged;
         HasUsedUltimate.OnValueChanged -= OnHasUsedUltimateChanged;
+        HasMoved.OnValueChanged -= OnHasMovedChanged;
         StunnedTurns.OnValueChanged -= (_, now) => { };
         CursedTurns.OnValueChanged -= (_, now) => { };
     }
@@ -197,6 +205,11 @@ public class NetworkPiece : NetworkBehaviour
     {
         piece.SetUltimateUsed(now, replicate: false);
         piece.board?.RefreshInfoIf(piece);
+    }
+
+    private void OnHasMovedChanged(bool _, bool now)
+    {
+        piece.SetHasMoved(now, replicate: false);
     }
 
     private void OnLevelChanged(int prev, int now)
