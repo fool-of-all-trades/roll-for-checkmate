@@ -160,7 +160,12 @@ namespace Pieces
         public void UseUltimateAbility(IGameController controller)
         {
             if (CanUseUltimate())
+            {
                 ultimateAbility.UseAbility(controller, this);
+
+                if (HasUsedUltimate())
+                    SetUltimateUsed(true);
+            }
         }
 
         /// <summary>
@@ -172,9 +177,18 @@ namespace Pieces
         public bool HasUsedUltimate()
             => ultimateAbility != null && ultimateAbility.HasUsedUltimate;
 
-        public void SetUltimateUsed(bool used)
+        public void SetUltimateUsed(bool used, bool replicate = true)
         {
-            ultimateAbility?.SetUltimateUsed(used);
+            if (ultimateAbility == null) return;
+
+            ultimateAbility.SetUltimateUsed(used);
+
+            if (replicate && NetworkManager.Singleton && NetworkManager.Singleton.IsServer)
+            {
+                var networkPiece = GetComponent<NetworkPiece>();
+                if (networkPiece)
+                    networkPiece.HasUsedUltimate.Value = used;
+            }
         }
 
         /// <summary>

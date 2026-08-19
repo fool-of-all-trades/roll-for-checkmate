@@ -17,6 +17,7 @@ public class MoveRelay : NetworkBehaviour
     private bool _isBroadcaster;
     private bool _ascensionResumeSubscribed;
     private ulong? _lastResumedAscensionPawnId;
+    private ulong? _lastResumedAscensionMovePieceId;
 
     private readonly struct CommandSenderContext
     {
@@ -330,24 +331,50 @@ public class MoveRelay : NetworkBehaviour
 
         var pawn = controller.PendingAscensionPawn;
         if (pawn == null)
-        {
             _lastResumedAscensionPawnId = null;
-            return;
-        }
+
+        var ascensionMovePiece = controller.PendingAscensionMovePiece;
+        if (ascensionMovePiece == null)
+            _lastResumedAscensionMovePieceId = null;
 
         var ownerTeam = PlayerTeams.GetTeam(OwnerClientId);
         if (ownerTeam == TeamSide.None) return;
 
-        bool ownerIsWhite = ownerTeam == TeamSide.White;
-        if (ownerIsWhite != pawn.Team) return;
+        if (pawn != null)
+        {
+            bool ownerIsWhite = ownerTeam == TeamSide.White;
+            if (ownerIsWhite == pawn.Team)
+            {
+                var pawnNetworkObject = pawn.GetComponent<NetworkObject>();
+                if (pawnNetworkObject != null && pawnNetworkObject.IsSpawned &&
+                    _lastResumedAscensionPawnId != pawnNetworkObject.NetworkObjectId &&
+                    controller.GetPendingAscensionBeneficiaries(pawn).Count > 0)
+                {
+                    TrySendPawnAscensionSelection(controller, pawn, OwnerClientId);
+                    _lastResumedAscensionPawnId = pawnNetworkObject.NetworkObjectId;
+                }
+            }
 
-        var pawnNetworkObject = pawn.GetComponent<NetworkObject>();
-        if (pawnNetworkObject == null || !pawnNetworkObject.IsSpawned) return;
-        if (_lastResumedAscensionPawnId == pawnNetworkObject.NetworkObjectId) return;
-        if (controller.GetPendingAscensionBeneficiaries(pawn).Count == 0) return;
+            return;
+        }
 
-        TrySendPawnAscensionSelection(controller, pawn, OwnerClientId);
-        _lastResumedAscensionPawnId = pawnNetworkObject.NetworkObjectId;
+        if (ascensionMovePiece == null) return;
+
+        bool moveOwnerIsWhite = ownerTeam == TeamSide.White;
+        if (moveOwnerIsWhite != ascensionMovePiece.Team) return;
+        if (!ascensionMovePiece.gameObject.activeInHierarchy) return;
+
+        var ascensionMoveNetworkObject = ascensionMovePiece.GetComponent<NetworkObject>();
+        var ascensionMoveNetworkPiece = ascensionMovePiece.GetComponent<NetworkPiece>();
+        if (ascensionMoveNetworkObject == null || !ascensionMoveNetworkObject.IsSpawned ||
+            ascensionMoveNetworkPiece == null || ascensionMoveNetworkPiece.IsCaptured.Value ||
+            ascensionMoveNetworkPiece.IsAscended.Value)
+            return;
+        if (controller.PendingAscensionMovePiece != ascensionMovePiece) return;
+        if (_lastResumedAscensionMovePieceId == ascensionMoveNetworkObject.NetworkObjectId) return;
+
+        TrySendAscensionMovePrompt(ascensionMovePiece, OwnerClientId);
+        _lastResumedAscensionMovePieceId = ascensionMoveNetworkObject.NetworkObjectId;
     }
 
     private void OnMoveAccepted(MoveResult m)
