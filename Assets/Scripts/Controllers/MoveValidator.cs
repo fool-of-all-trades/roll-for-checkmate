@@ -155,8 +155,7 @@ namespace Controller
             if (DestinationOk(pawn, tr, tc) && pieceAt(tr, tc) != null)
                 return true;
 
-            var epsq = turnMgr.EnPassantSquare;
-            return epsq.HasValue && epsq.Value.row == tr && epsq.Value.col == tc;
+            return turnMgr.TryGetValidEnPassantVictim(pawn, tr, tc, pieceAt, out _);
         }
 
         #region Castling helpers

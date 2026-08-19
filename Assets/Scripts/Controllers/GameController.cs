@@ -106,7 +106,13 @@ namespace Controller
                 return false;
 
             if (isResolvingAscensionMove)
+            {
                 _pendingAscensionMovePiece = null;
+
+                if (turnMgr.LastDoubleStepPawn != null &&
+                    turnMgr.LastDoubleStepPawn.Team == turnMgr.WhiteTurn)
+                    ClearEnPassant();
+            }
 
             int fromRow = piece.Row;
             int fromCol = piece.Col;
@@ -174,25 +180,25 @@ namespace Controller
 
 
             // ----- en‑passant capture BEFORE commit -----
-            if (piece is Pawn pawn && captured == null)
+            if (piece is Pawn pawn && captured == null &&
+                PieceAt(toRow, toCol) == null && Math.Abs(toCol - fromCol) == 1)
             {
-                var eps = turnMgr.EnPassantSquare;
-                if (eps.HasValue && eps.Value.row == toRow && eps.Value.col == toCol)
-                {
-                    int dir = pawn.Team ? 1 : -1;
-                    Piece victim = PieceAt(toRow - dir, toCol);
-                    if (victim is Pawn && victim.Team != pawn.Team)
-                    {
-                        CapturePieceAndClearAscensionMove(victim, pawn);
-                        captured = victim;           // include in MoveResult
+                if (!turnMgr.TryGetValidEnPassantVictim(
+                        pawn,
+                        toRow,
+                        toCol,
+                        PieceAt,
+                        out var victim))
+                    return false;
 
-                        // After client reconnect they won't see ghosts of captured pieces
-                        if (IsServer)
-                        {
-                            var npV = victim.GetComponent<NetworkPiece>();
-                            if (npV) npV.IsCaptured.Value = true;
-                        }
-                    }
+                CapturePieceAndClearAscensionMove(victim, pawn);
+                captured = victim;           // include in MoveResult
+
+                // After client reconnect they won't see ghosts of captured pieces
+                if (IsServer)
+                {
+                    var npV = victim.GetComponent<NetworkPiece>();
+                    if (npV) npV.IsCaptured.Value = true;
                 }
             }
 
@@ -211,7 +217,7 @@ namespace Controller
             if (piece is Pawn p && Math.Abs(toRow - fromRow) == 2)
             {
                 int midRow = (fromRow + toRow) / 2;
-                turnMgr.SetEnPassant(midRow, fromCol, p);
+                SetEnPassant(midRow, fromCol, p);
             }
 
             // ----- castling rook move + events -----
@@ -466,7 +472,11 @@ namespace Controller
             bool teamBeforeSacredRoad = context.Mover.Team;
             sacredRoad.ProcessMove(context.Mover);
             if (context.Mover.Team != teamBeforeSacredRoad)
+            {
                 ClearAscensionMove(context.Mover);
+                if (turnMgr.LastDoubleStepPawn == context.Mover)
+                    ClearEnPassant();
+            }
 
             TryBeginPawnAscension(context.Mover);
         }
@@ -510,6 +520,9 @@ namespace Controller
 
         private void RetireAscendedPawn(Pawn pawn, NetworkPiece networkPiece)
         {
+            if (turnMgr.LastDoubleStepPawn == pawn)
+                ClearEnPassant();
+
             ClearAscensionMove(pawn);
             networkPiece.IsAscended.Value = true;
             pieces.Remove(pawn);
@@ -519,6 +532,7 @@ namespace Controller
         {
             bool teamThatCompletedTurn = turnMgr.WhiteTurn;
             turnMgr.ToggleTurn();
+            CommitEnPassantNetworkState();
             TurnSync.Instance?.CommitTurn(turnMgr.WhiteTurn);
             queensCurse.TickTurn();
             foreach (var p in pieces) p.TickStunnedTurns();
@@ -542,6 +556,9 @@ namespace Controller
 
         private void CapturePieceAndClearAscensionMove(Piece captured, Piece winner)
         {
+            if (captured == turnMgr.LastDoubleStepPawn)
+                ClearEnPassant();
+
             ClearAscensionMove(captured);
             captureManager.CapturePiece(pieces, captured, winner);
         }
@@ -557,9 +574,44 @@ namespace Controller
             int fromRow = piece.Row;
             int fromCol = piece.Col;
 
+            if (piece == turnMgr.LastDoubleStepPawn)
+                ClearEnPassant();
+
             piece.SetBoardCoords(toRow, toCol);
             OnMoveAccepted?.Invoke(new MoveResult(piece, fromRow, fromCol, toRow, toCol));
             return true;
+        }
+
+        private void SetEnPassant(int row, int col, Pawn pawn)
+        {
+            turnMgr.SetEnPassant(row, col, pawn);
+            CommitEnPassantNetworkState();
+        }
+
+        private void ClearEnPassant()
+        {
+            turnMgr.ClearEnPassant();
+            CommitEnPassantNetworkState();
+        }
+
+        private void CommitEnPassantNetworkState()
+        {
+            if (!IsServer || TurnSync.Instance == null) return;
+
+            var square = turnMgr.EnPassantSquare;
+            var pawn = turnMgr.LastDoubleStepPawn;
+            var pawnNetworkObject = pawn != null ? pawn.GetComponent<NetworkObject>() : null;
+
+            if (!square.HasValue || pawnNetworkObject == null || !pawnNetworkObject.IsSpawned)
+            {
+                TurnSync.Instance.CommitEnPassant(default);
+                return;
+            }
+
+            TurnSync.Instance.CommitEnPassant(new EnPassantNetworkState(
+                square.Value.row,
+                square.Value.col,
+                pawnNetworkObject.NetworkObjectId));
         }
 
         /// <summary>
