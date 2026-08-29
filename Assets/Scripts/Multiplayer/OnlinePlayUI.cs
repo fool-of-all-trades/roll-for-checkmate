@@ -45,7 +45,10 @@ public class OnlinePlayUI : MonoBehaviour
     {
         try
         {
-            await _sessionService.JoinPrivateMatchAsync(lobbyCodeField.text);
+            if (string.IsNullOrWhiteSpace(lobbyCodeField.text))
+                await _sessionService.TryReconnectAsync();
+            else
+                await _sessionService.JoinPrivateMatchAsync(lobbyCodeField.text);
         }
         catch (Exception exception)
         {

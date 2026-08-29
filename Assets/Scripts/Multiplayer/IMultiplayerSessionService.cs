@@ -11,6 +11,8 @@ public enum MultiplayerSessionState
     Joining,
     Connecting,
     Connected,
+    Disconnected,
+    Reconnecting,
     Leaving,
     Failed
 }
@@ -33,6 +35,7 @@ public interface IMultiplayerSessionService
     Task InitializeAsync();
     Task CreatePrivateMatchAsync();
     Task JoinPrivateMatchAsync(string code);
+    Task<bool> TryReconnectAsync();
     Task LeaveMatchAsync();
 
     bool TryGetValidatedPlayerId(ulong clientId, out string playerId);
