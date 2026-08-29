@@ -23,7 +23,7 @@ public static class RelayManager
         string joinCode = await RelayService.Instance.GetJoinCodeAsync(alloc.AllocationId);
 
         var utp = networkManager.GetComponent<UnityTransport>();
-        var relayData = new RelayServerData(alloc, "dtls");
+        var relayData = AllocationUtils.ToRelayServerData(alloc, "dtls");
         utp.SetRelayServerData(relayData);
 
         bool started = networkManager.StartHost();
@@ -51,7 +51,7 @@ public static class RelayManager
         JoinAllocation join = await RelayService.Instance.JoinAllocationAsync(joinCode);
 
         var utp = networkManager.GetComponent<UnityTransport>();
-        var relayData = new RelayServerData(join, "dtls");
+        var relayData = AllocationUtils.ToRelayServerData(join, "dtls");
         utp.SetRelayServerData(relayData);
 
         bool started = networkManager.StartClient();

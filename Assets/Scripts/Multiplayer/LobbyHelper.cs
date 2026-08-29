@@ -45,7 +45,7 @@ public class LobbyManager : MonoBehaviour
             }
         };
 
-        CurrentLobby = await Lobbies.Instance.CreateLobbyAsync(lobbyName, maxPlayers, options);
+        CurrentLobby = await LobbyService.Instance.CreateLobbyAsync(lobbyName, maxPlayers, options);
         Debug.Log($"[Lobby] Created {CurrentLobby.Id} code={CurrentLobby.LobbyCode}");
         StartHeartbeat();
         StartPolling();
@@ -56,7 +56,7 @@ public class LobbyManager : MonoBehaviour
     public async Task<Lobby> JoinLobbyByCodeAsync(string code)
     {
         await UgsBootstrap.Init();
-        CurrentLobby = await Lobbies.Instance.JoinLobbyByCodeAsync(code);
+        CurrentLobby = await LobbyService.Instance.JoinLobbyByCodeAsync(code);
         Debug.Log($"[Lobby] Joined {CurrentLobby.Id}");
         StartPolling();
         OnLobbyChanged?.Invoke(CurrentLobby);
@@ -78,7 +78,7 @@ public class LobbyManager : MonoBehaviour
                                 value: "chess") // matches Data["mode"]
             }
         };
-        CurrentLobby = await Lobbies.Instance.QuickJoinLobbyAsync(q);
+        CurrentLobby = await LobbyService.Instance.QuickJoinLobbyAsync(q);
         Debug.Log($"[Lobby] Quick joined {CurrentLobby.Id}");
         StartPolling();
         OnLobbyChanged?.Invoke(CurrentLobby);
@@ -96,7 +96,7 @@ public class LobbyManager : MonoBehaviour
                 { "started",  new DataObject(DataObject.VisibilityOptions.Member, "1") }
             }
         };
-        CurrentLobby = await Lobbies.Instance.UpdateLobbyAsync(CurrentLobby.Id, up);
+        CurrentLobby = await LobbyService.Instance.UpdateLobbyAsync(CurrentLobby.Id, up);
         OnLobbyChanged?.Invoke(CurrentLobby);
     }
 
@@ -113,7 +113,7 @@ public class LobbyManager : MonoBehaviour
         if (CurrentLobby == null) return;
         try
         {
-            await Lobbies.Instance.RemovePlayerAsync(CurrentLobby.Id, AuthenticationService.Instance.PlayerId);
+            await LobbyService.Instance.RemovePlayerAsync(CurrentLobby.Id, AuthenticationService.Instance.PlayerId);
         }
         catch { /* ignored */ }
         CurrentLobby = null;
@@ -143,7 +143,7 @@ public class LobbyManager : MonoBehaviour
     {
         while (CurrentLobby != null)
         {
-            Lobbies.Instance.SendHeartbeatPingAsync(CurrentLobby.Id);
+            LobbyService.Instance.SendHeartbeatPingAsync(CurrentLobby.Id);
             yield return new WaitForSecondsRealtime(heartbeatSecs);
         }
     }
@@ -152,7 +152,7 @@ public class LobbyManager : MonoBehaviour
     {
         while (CurrentLobby != null)
         {
-            var t = Lobbies.Instance.GetLobbyAsync(CurrentLobby.Id);
+            var t = LobbyService.Instance.GetLobbyAsync(CurrentLobby.Id);
             while (!t.IsCompleted) yield return null;
             if (!t.IsFaulted) { CurrentLobby = t.Result; OnLobbyChanged?.Invoke(CurrentLobby); }
 
