@@ -1,134 +1,90 @@
+using System;
 using System.Threading.Tasks;
 using TMPro;
-using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class OnlinePlayUI : MonoBehaviour
 {
     [Header("UI")]
-    [SerializeField] private TMP_InputField lobbyCodeField;   // for join by code
+    [SerializeField] private TMP_InputField lobbyCodeField;
     [SerializeField] private TMP_Text statusLabel;
     [SerializeField] private Button createLobbyBtn;
     [SerializeField] private Button joinByCodeBtn;
     [SerializeField] private Button quickPlayBtn;
-    [SerializeField] private Button startMatchBtn; // Host only: allocate Relay + start host
+    [SerializeField] private Button startMatchBtn;
     [SerializeField] private Button leaveLobbyBtn;
 
-    private bool _isConnectingToRelay;
-    private bool _relayClientStartIssued;
+    private IMultiplayerSessionService _sessionService;
 
     void Awake()
     {
+        _sessionService = UnityMpsSessionService.Instance;
+        _sessionService.StatusChanged += OnSessionStatusChanged;
+
         createLobbyBtn.onClick.AddListener(async () => await CreateLobby());
         joinByCodeBtn.onClick.AddListener(async () => await JoinByCode());
         quickPlayBtn.onClick.AddListener(async () => await QuickPlay());
         startMatchBtn.onClick.AddListener(async () => await StartMatchAsHost());
         leaveLobbyBtn.onClick.AddListener(async () => await LeaveLobby());
-
-        if (LobbyManager.Instance) LobbyManager.Instance.OnLobbyChanged += OnLobbyChanged;
     }
 
     async Task CreateLobby()
     {
         try
         {
-            await LobbyManager.Instance.CreateLobbyAsync("Chess Lobby", 2);
-            statusLabel.text = $"Lobby created. Code: {LobbyManager.Instance.CurrentLobby.LobbyCode}";
+            await _sessionService.CreatePrivateMatchAsync();
         }
-        catch (System.Exception e) { statusLabel.text = $"Create failed: {e.Message}"; }
+        catch (Exception exception)
+        {
+            statusLabel.text = exception.Message;
+        }
     }
 
     async Task JoinByCode()
     {
         try
         {
-            var code = lobbyCodeField.text.Trim();
-            await LobbyManager.Instance.JoinLobbyByCodeAsync(code);
-            statusLabel.text = "Joined lobby. Waiting for host…";
-            TryAutoConnectIfReady();
+            await _sessionService.JoinPrivateMatchAsync(lobbyCodeField.text);
         }
-        catch (System.Exception e) { statusLabel.text = $"Join failed: {e.Message}"; }
+        catch (Exception exception)
+        {
+            statusLabel.text = exception.Message;
+        }
     }
 
-    async Task QuickPlay()
+    Task QuickPlay()
     {
-        try
-        {
-            await LobbyManager.Instance.QuickJoinAsync();
-            statusLabel.text = "Matched. Waiting for host…";
-            TryAutoConnectIfReady();
-        }
-        catch (System.Exception e) { statusLabel.text = $"Quick play failed: {e.Message}"; }
+        statusLabel.text = "Quick Play is not migrated yet. Use a private match code.";
+        return Task.CompletedTask;
     }
 
-    async Task StartMatchAsHost()
+    Task StartMatchAsHost()
     {
-        // Host allocates Relay, sets joinCode into Lobby, then starts Host
-        try
-        {
-            string joinCode = await RelayManager.StartHostWithRelayAsync(2);
-            await LobbyManager.Instance.SetRelayJoinCodeAsync(joinCode);
-            statusLabel.text = $"Hosting… Join code: {joinCode}";
-        }
-        catch (System.Exception e) { statusLabel.text = $"Host failed: {e.Message}"; }
+        statusLabel.text = "Private matches start automatically when the second player joins.";
+        return Task.CompletedTask;
     }
 
     async Task LeaveLobby()
     {
-        _isConnectingToRelay = false;
-        _relayClientStartIssued = false;
-
-        await LobbyManager.Instance.LeaveAsync();
-        statusLabel.text = "Left lobby.";
-        if (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient)
+        try
         {
-            NetworkManager.Singleton.Shutdown();
+            await _sessionService.LeaveMatchAsync();
+        }
+        catch (Exception exception)
+        {
+            statusLabel.text = exception.Message;
         }
     }
-
 
     void OnDestroy()
     {
-        if (LobbyManager.Instance)
-            LobbyManager.Instance.OnLobbyChanged -= OnLobbyChanged;
-
-        _isConnectingToRelay = false;
-        _relayClientStartIssued = false;
-    }
-    void OnLobbyChanged(Unity.Services.Lobbies.Models.Lobby lob)
-    {
-        if (lob == null) return;
-        TryAutoConnectIfReady();
+        if (_sessionService != null)
+            _sessionService.StatusChanged -= OnSessionStatusChanged;
     }
 
-    async void TryAutoConnectIfReady()
+    private void OnSessionStatusChanged(MultiplayerSessionState state, string message)
     {
-        if (_isConnectingToRelay || _relayClientStartIssued) return;
-
-        var nm = NetworkManager.Singleton;
-        if (nm == null || nm.IsServer || nm.IsClient || nm.IsListening) return;
-
-        var lobbyManager = LobbyManager.Instance;
-        if (lobbyManager == null || lobbyManager.CurrentLobby == null) return;
-
-        var code = lobbyManager.GetRelayJoinCode();
-        if (string.IsNullOrEmpty(code)) return;
-
-        _isConnectingToRelay = true;
-        statusLabel.text = "Connecting to host…";
-
-        try
-        {
-            await RelayManager.JoinClientWithRelayAsync(code);
-            _relayClientStartIssued = true;
-            statusLabel.text = "Connected!";
-        }
-        catch (System.Exception e)
-        {
-            _isConnectingToRelay = false;
-            _relayClientStartIssued = false;
-            statusLabel.text = $"Connect failed: {e.Message}";
-        }
+        statusLabel.text = message;
     }
 }
