@@ -56,10 +56,16 @@ public class OnlinePlayUI : MonoBehaviour
         }
     }
 
-    Task QuickPlay()
+    async Task QuickPlay()
     {
-        statusLabel.text = "Quick Play is not migrated yet. Use a private match code.";
-        return Task.CompletedTask;
+        try
+        {
+            await _sessionService.FindOrCreateQuickMatchAsync();
+        }
+        catch (Exception exception)
+        {
+            statusLabel.text = exception.Message;
+        }
     }
 
     Task StartMatchAsHost()

@@ -7,6 +7,7 @@ public enum MultiplayerSessionState
     Idle,
     SigningIn,
     Creating,
+    Searching,
     WaitingForOpponent,
     Joining,
     Connecting,
@@ -35,6 +36,7 @@ public interface IMultiplayerSessionService
     Task InitializeAsync();
     Task CreatePrivateMatchAsync();
     Task JoinPrivateMatchAsync(string code);
+    Task FindOrCreateQuickMatchAsync();
     Task<bool> TryReconnectAsync();
     Task LeaveMatchAsync();
 
