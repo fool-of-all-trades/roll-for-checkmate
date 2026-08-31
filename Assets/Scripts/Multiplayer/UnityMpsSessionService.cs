@@ -40,6 +40,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private int _reconnectAttemptInProgress;
     private bool _reconnectUnavailable;
     private int _sessionOperationOwner;
+    private long _sessionLifecycleGeneration;
     private bool _quickMatchOperationInProgress;
     private bool _quickMatchCancellationRequested;
     private ulong? _connectedLocalClientId;
@@ -340,7 +341,17 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
         try
         {
-            return await TryReconnectOwnedAsync();
+            long lifecycleGeneration = Interlocked.Read(ref _sessionLifecycleGeneration);
+            bool reconnectSucceeded = await TryReconnectOwnedAsync(lifecycleGeneration);
+            if (IsReconnectStale(lifecycleGeneration) &&
+                (_session != null || _intentionalLeave))
+            {
+                TraceSessionOperation("Reconnect", "reconnect-stale-before-release");
+                await CleanupStaleReconnectAsync(_session);
+                return false;
+            }
+
+            return reconnectSucceeded;
         }
         finally
         {
@@ -348,7 +359,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         }
     }
 
-    private async Task<bool> TryReconnectOwnedAsync()
+    private async Task<bool> TryReconnectOwnedAsync(long lifecycleGeneration)
     {
         if (Volatile.Read(ref _reconnectUnavailable))
         {
@@ -388,17 +399,21 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
             await InitializeAsync();
 
-            if (_session?.IsHost == true)
+            bool reconnectIsStale = IsReconnectStale(lifecycleGeneration);
+            if (!reconnectIsStale && _session?.IsHost == true)
             {
                 SetState(MultiplayerSessionState.Failed, "Host reconnect is not supported for this match.");
                 return false;
             }
 
-            SetState(MultiplayerSessionState.Reconnecting, "Reconnecting...");
+            if (!reconnectIsStale)
+                SetState(MultiplayerSessionState.Reconnecting, "Reconnecting...");
 
             TraceSessionOperation("Reconnect", "before-mps");
             var joinedMemberships = await MultiplayerService.Instance.GetJoinedSessionIdsAsync();
             TraceSessionOperation("Reconnect", "after-mps");
+            if (IsReconnectStale(lifecycleGeneration))
+                TraceSessionOperation("Reconnect", "reconnect-stale-after-discovery");
             var joinedSessionIds = (joinedMemberships ?? new List<string>())
                 .Where(sessionId => !string.IsNullOrWhiteSpace(sessionId))
                 .Distinct(StringComparer.Ordinal)
@@ -408,6 +423,12 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             {
                 TraceSessionOperation("Reconnect", "zero-memberships");
                 Volatile.Write(ref _reconnectUnavailable, true);
+                if (IsReconnectStale(lifecycleGeneration))
+                {
+                    await CleanupStaleReconnectAsync(null);
+                    return false;
+                }
+
                 ClearSession();
                 SetState(MultiplayerSessionState.Failed, "Session expired. Reconnect is no longer available.");
                 return false;
@@ -415,8 +436,14 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
             UnityEngine.Debug.Log("[Reconnect] selecting session");
             var sessionId = await SelectReconnectSessionIdAsync(joinedSessionIds);
+            if (IsReconnectStale(lifecycleGeneration))
+                TraceSessionOperation("Reconnect", "reconnect-stale-after-selection");
             if (string.IsNullOrEmpty(sessionId))
+            {
+                if (IsReconnectStale(lifecycleGeneration))
+                    await CleanupStaleReconnectAsync(null);
                 return false;
+            }
 
             UnityEngine.Debug.Log($"[Reconnect] selected session {sessionId}");
             UnityEngine.Debug.Log("[Reconnect] configuring NGO identity");
@@ -427,6 +454,13 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             var reconnectedSession = await MultiplayerService.Instance.ReconnectToSessionAsync(sessionId);
             TraceSessionOperation("Reconnect", "after-mps");
             UnityEngine.Debug.Log("[Reconnect] session returned");
+            if (IsReconnectStale(lifecycleGeneration))
+            {
+                TraceSessionOperation("Reconnect", "reconnect-stale-after-mps");
+                await CleanupStaleReconnectAsync(reconnectedSession);
+                return false;
+            }
+
             if (reconnectedSession == null)
                 throw new InvalidOperationException("MPS reconnect returned no session.");
 
@@ -444,6 +478,13 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 return false;
             }
 
+            if (IsReconnectStale(lifecycleGeneration))
+            {
+                TraceSessionOperation("Reconnect", "reconnect-stale-before-adoption");
+                await CleanupStaleReconnectAsync(reconnectedSession);
+                return false;
+            }
+
             UnityEngine.Debug.Log("[Reconnect] replacing session");
             ReplaceSession(reconnectedSession);
             SetState(MultiplayerSessionState.Connecting, "Rejoined session. Connecting...");
@@ -452,6 +493,12 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         }
         catch (SessionException exception) when (exception.Error == SessionError.SessionNotFound)
         {
+            if (IsReconnectStale(lifecycleGeneration))
+            {
+                await CleanupStaleReconnectAsync(null);
+                return false;
+            }
+
             Volatile.Write(ref _reconnectUnavailable, true);
             ClearSession();
             SetState(MultiplayerSessionState.Failed, "Match ended. The host left.");
@@ -459,6 +506,12 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         }
         catch (Exception exception)
         {
+            if (IsReconnectStale(lifecycleGeneration))
+            {
+                await CleanupStaleReconnectAsync(null);
+                return false;
+            }
+
             UnityEngine.Debug.LogException(exception);
             Fail("Reconnect failed", exception);
             return false;
@@ -564,6 +617,20 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     public async Task LeaveMatchAsync()
     {
         TraceSessionOperation("Leave", "enter");
+        Interlocked.Increment(ref _sessionLifecycleGeneration);
+
+        if ((SessionOperation)Volatile.Read(ref _sessionOperationOwner) == SessionOperation.Reconnect)
+        {
+            _intentionalLeave = true;
+            _unexpectedClientDisconnectPending = false;
+            Volatile.Write(ref _reconnectUnavailable, true);
+            SetState(MultiplayerSessionState.Leaving, "Leaving match...");
+            TraceSessionOperation("Leave", "leave-invalidated-reconnect");
+            SetState(MultiplayerSessionState.Idle, "Left match.");
+            TraceSessionOperation("Leave", "exit");
+            return;
+        }
+
         if (_session == null)
         {
             if (_quickMatchOperationInProgress)
@@ -1146,6 +1213,52 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         return acquired;
     }
 
+    private bool IsReconnectStale(long lifecycleGeneration)
+    {
+        return Interlocked.Read(ref _sessionLifecycleGeneration) != lifecycleGeneration;
+    }
+
+    private async Task CleanupStaleReconnectAsync(ISession staleSession)
+    {
+        TraceSessionOperation("Reconnect", "stale-reconnect-cleanup-start");
+
+        try
+        {
+            if (staleSession != null)
+                await staleSession.LeaveAsync();
+        }
+        catch (SessionException exception) when (
+            exception.Error == SessionError.SessionNotFound ||
+            exception.Error == SessionError.SessionDeleted ||
+            exception.Error == SessionError.NotInLobby ||
+            exception.Error == SessionError.InvalidOperation)
+        {
+            // The host/session may disappear while an intentionally abandoned reconnect is being cleaned up.
+        }
+        catch (Exception exception)
+        {
+            UnityEngine.Debug.LogException(exception);
+        }
+        finally
+        {
+            var networkManager = NetworkManager.Singleton;
+            if (networkManager != null &&
+                networkManager.IsListening &&
+                networkManager.IsClient &&
+                !networkManager.IsServer)
+            {
+                networkManager.Shutdown();
+            }
+
+            Volatile.Write(ref _reconnectUnavailable, true);
+            ClearSession();
+            _intentionalLeave = false;
+            _unexpectedClientDisconnectPending = false;
+            SetState(MultiplayerSessionState.Idle, "Left match.");
+            TraceSessionOperation("Reconnect", "stale-reconnect-cleanup-complete");
+        }
+    }
+
     private bool RejectExistingSessionLifecycle(SessionOperation operation)
     {
         if (_session == null)
@@ -1182,6 +1295,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             $"isClient={networkManager?.IsClient ?? false} " +
             $"isServer={networkManager?.IsServer ?? false} " +
             $"operationOwner={(SessionOperation)Volatile.Read(ref _sessionOperationOwner)} " +
+            $"lifecycleGeneration={Interlocked.Read(ref _sessionLifecycleGeneration)} " +
             $"reconnectGate={Volatile.Read(ref _reconnectAttemptInProgress)} " +
             $"quickInProgress={_quickMatchOperationInProgress} " +
             $"thread={Thread.CurrentThread.ManagedThreadId} " +
