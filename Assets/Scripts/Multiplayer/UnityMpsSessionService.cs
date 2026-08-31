@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.Services.Authentication;
@@ -11,6 +13,15 @@ using Unity.Services.Relay.Models;
 
 public sealed class UnityMpsSessionService : IMultiplayerSessionService
 {
+    private enum SessionOperation
+    {
+        None,
+        CreatePrivate,
+        JoinPrivate,
+        Quick,
+        Reconnect
+    }
+
     private const int MatchPlayerLimit = 2;
     private const int MaximumPlayerIdPayloadBytes = 256;
     private const int QuickJoinTimeoutSeconds = 5;
@@ -19,13 +30,16 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private const string MatchmakingStatePropertyKey = "matchmakingState";
     private const string QuickMatchWaitingValue = "rfc.chess.quick.v1.waiting.2p";
     private const string QuickMatchStartedValue = "rfc.chess.quick.v1.started.2p";
+    private const string DiagnosticBuildMarker = "Patch1B-diagnostic";
 
     private ISession _session;
     private string _originalHostPlayerId = string.Empty;
     private bool _hostNetworkStartRequested;
     private bool _intentionalLeave;
     private bool _unexpectedClientDisconnectPending;
-    private bool _reconnectAttemptInProgress;
+    private int _reconnectAttemptInProgress;
+    private bool _reconnectUnavailable;
+    private int _sessionOperationOwner;
     private bool _quickMatchOperationInProgress;
     private bool _quickMatchCancellationRequested;
     private ulong? _connectedLocalClientId;
@@ -82,189 +96,296 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     public async Task CreatePrivateMatchAsync()
     {
-        EnsureNoActiveSession();
-        await InitializeAsync();
-        ConfigureNgoIdentityPayload();
-        SetState(MultiplayerSessionState.Creating, "Creating private match...");
+        TraceSessionOperation("CreatePrivate", "enter");
+        if (RejectExistingSessionLifecycle(SessionOperation.CreatePrivate))
+            return;
+        if (!TryAcquireSessionOperation(SessionOperation.CreatePrivate))
+            return;
 
         try
         {
-            var options = new SessionOptions
+            if (RejectExistingSessionLifecycle(SessionOperation.CreatePrivate))
+                return;
+
+            EnsureNoActiveSession();
+            await InitializeAsync();
+            ConfigureNgoIdentityPayload();
+            SetState(MultiplayerSessionState.Creating, "Creating private match...");
+
+            try
             {
-                Name = PrivateMatchName,
-                MaxPlayers = MatchPlayerLimit,
-                IsPrivate = true,
-                IsLocked = false
-            };
+                var options = new SessionOptions
+                {
+                    Name = PrivateMatchName,
+                    MaxPlayers = MatchPlayerLimit,
+                    IsPrivate = true,
+                    IsLocked = false
+                };
 
-            options.WithNetworkOptions(new NetworkOptions
+                options.WithNetworkOptions(new NetworkOptions
+                {
+                    RelayProtocol = RelayProtocol.DTLS
+                });
+
+                TraceSessionOperation("CreatePrivate", "before-mps");
+                _session = await MultiplayerService.Instance.CreateSessionAsync(options);
+                TraceSessionOperation("CreatePrivate", "after-mps");
+                CaptureOriginalHost(_session);
+                SubscribeToSession(_session);
+                SetState(
+                    MultiplayerSessionState.WaitingForOpponent,
+                    $"Private match created. Code: {_session.Code}. Waiting for opponent...");
+
+                await TryStartMatchIfReadyAsync();
+                Volatile.Write(ref _reconnectUnavailable, false);
+                TraceSessionOperation("CreatePrivate", "exit");
+            }
+            catch (Exception exception)
             {
-                RelayProtocol = RelayProtocol.DTLS
-            });
-
-            _session = await MultiplayerService.Instance.CreateSessionAsync(options);
-            CaptureOriginalHost(_session);
-            SubscribeToSession(_session);
-            SetState(
-                MultiplayerSessionState.WaitingForOpponent,
-                $"Private match created. Code: {_session.Code}. Waiting for opponent...");
-
-            await TryStartMatchIfReadyAsync();
+                TraceSessionOperation("CreatePrivate", "exit");
+                ClearSession();
+                throw Fail("Create private match failed", exception);
+            }
         }
-        catch (Exception exception)
+        finally
         {
-            ClearSession();
-            throw Fail("Create private match failed", exception);
+            ReleaseSessionOperation(SessionOperation.CreatePrivate);
         }
     }
 
     public async Task JoinPrivateMatchAsync(string code)
     {
-        EnsureNoActiveSession();
-
-        code = code?.Trim();
-        if (string.IsNullOrEmpty(code))
-            throw Fail("Join private match failed", new ArgumentException("Enter a session code."));
-
-        await InitializeAsync();
-        ConfigureNgoIdentityPayload();
-        SetState(MultiplayerSessionState.Joining, "Joining private match...");
+        TraceSessionOperation("JoinPrivate", "enter");
+        if (RejectExistingSessionLifecycle(SessionOperation.JoinPrivate))
+            return;
+        if (!TryAcquireSessionOperation(SessionOperation.JoinPrivate))
+            return;
 
         try
         {
-            var options = new JoinSessionOptions();
-            options.WithNetworkOptions(new NetworkOptions
-            {
-                RelayProtocol = RelayProtocol.DTLS
-            });
+            if (RejectExistingSessionLifecycle(SessionOperation.JoinPrivate))
+                return;
 
-            _session = await MultiplayerService.Instance.JoinSessionByCodeAsync(code, options);
-            CaptureOriginalHost(_session);
-            SubscribeToSession(_session);
-            SetState(MultiplayerSessionState.Connecting, "Joined private match. Waiting for host network...");
-            ApplyNetworkState(_session.Network.State);
+            EnsureNoActiveSession();
+
+            code = code?.Trim();
+            if (string.IsNullOrEmpty(code))
+                throw Fail("Join private match failed", new ArgumentException("Enter a session code."));
+
+            await InitializeAsync();
+            ConfigureNgoIdentityPayload();
+            SetState(MultiplayerSessionState.Joining, "Joining private match...");
+
+            try
+            {
+                var options = new JoinSessionOptions();
+                options.WithNetworkOptions(new NetworkOptions
+                {
+                    RelayProtocol = RelayProtocol.DTLS
+                });
+
+                TraceSessionOperation("JoinPrivate", "before-mps");
+                _session = await MultiplayerService.Instance.JoinSessionByCodeAsync(code, options);
+                TraceSessionOperation("JoinPrivate", "after-mps");
+                CaptureOriginalHost(_session);
+                SubscribeToSession(_session);
+                SetState(MultiplayerSessionState.Connecting, "Joined private match. Waiting for host network...");
+                ApplyNetworkState(_session.Network.State);
+                Volatile.Write(ref _reconnectUnavailable, false);
+                TraceSessionOperation("JoinPrivate", "exit");
+            }
+            catch (Exception exception)
+            {
+                TraceSessionOperation("JoinPrivate", "exit");
+                ClearSession();
+                throw Fail("Join private match failed", exception);
+            }
         }
-        catch (Exception exception)
+        finally
         {
-            ClearSession();
-            throw Fail("Join private match failed", exception);
+            ReleaseSessionOperation(SessionOperation.JoinPrivate);
         }
     }
 
     public async Task FindOrCreateQuickMatchAsync()
     {
-        EnsureNoActiveSession();
-        _quickMatchOperationInProgress = true;
-        _quickMatchCancellationRequested = false;
+        TraceSessionOperation("Quick", "enter");
+        if (RejectExistingSessionLifecycle(SessionOperation.Quick))
+            return;
+        if (!TryAcquireSessionOperation(SessionOperation.Quick))
+            return;
 
         try
         {
-            await InitializeAsync();
-            if (_quickMatchCancellationRequested)
+            if (RejectExistingSessionLifecycle(SessionOperation.Quick))
                 return;
 
-            ConfigureNgoIdentityPayload();
-            SetState(MultiplayerSessionState.Searching, "Searching for opponent...");
+            EnsureNoActiveSession();
+            _quickMatchOperationInProgress = true;
+            _quickMatchCancellationRequested = false;
 
-            var sessionOptions = new SessionOptions
+            try
             {
-                Name = QuickMatchName,
-                MaxPlayers = MatchPlayerLimit,
-                IsPrivate = false,
-                IsLocked = false,
-                SessionProperties = new Dictionary<string, SessionProperty>
+                await InitializeAsync();
+                if (_quickMatchCancellationRequested)
+                    return;
+
+                ConfigureNgoIdentityPayload();
+                SetState(MultiplayerSessionState.Searching, "Searching for opponent...");
+
+                var sessionOptions = new SessionOptions
                 {
-                    [MatchmakingStatePropertyKey] = new SessionProperty(
-                        QuickMatchWaitingValue,
-                        VisibilityPropertyOptions.Public,
-                        PropertyIndex.String1)
-                }
-            };
+                    Name = QuickMatchName,
+                    MaxPlayers = MatchPlayerLimit,
+                    IsPrivate = false,
+                    IsLocked = false,
+                    SessionProperties = new Dictionary<string, SessionProperty>
+                    {
+                        [MatchmakingStatePropertyKey] = new SessionProperty(
+                            QuickMatchWaitingValue,
+                            VisibilityPropertyOptions.Public,
+                            PropertyIndex.String1)
+                    }
+                };
 
-            sessionOptions.WithNetworkOptions(new NetworkOptions
-            {
-                RelayProtocol = RelayProtocol.DTLS
-            });
-
-            var quickJoinOptions = new QuickJoinOptions
-            {
-                CreateSession = true,
-                Timeout = TimeSpan.FromSeconds(QuickJoinTimeoutSeconds),
-                Filters = new List<FilterOption>
+                sessionOptions.WithNetworkOptions(new NetworkOptions
                 {
-                    new FilterOption(
-                        FilterField.StringIndex1,
-                        QuickMatchWaitingValue,
-                        FilterOperation.Equal),
-                    new FilterOption(
-                        FilterField.AvailableSlots,
-                        "0",
-                        FilterOperation.Greater),
-                    new FilterOption(
-                        FilterField.IsLocked,
-                        "false",
-                        FilterOperation.Equal)
+                    RelayProtocol = RelayProtocol.DTLS
+                });
+
+                var quickJoinOptions = new QuickJoinOptions
+                {
+                    CreateSession = true,
+                    Timeout = TimeSpan.FromSeconds(QuickJoinTimeoutSeconds),
+                    Filters = new List<FilterOption>
+                    {
+                        new FilterOption(
+                            FilterField.StringIndex1,
+                            QuickMatchWaitingValue,
+                            FilterOperation.Equal),
+                        new FilterOption(
+                            FilterField.AvailableSlots,
+                            "0",
+                            FilterOperation.Greater),
+                        new FilterOption(
+                            FilterField.IsLocked,
+                            "false",
+                            FilterOperation.Equal)
+                    }
+                };
+
+                TraceSessionOperation("Quick", "before-mps");
+                var matchmadeSession = await MultiplayerService.Instance.MatchmakeSessionAsync(
+                    quickJoinOptions,
+                    sessionOptions);
+                TraceSessionOperation("Quick", "after-mps");
+                if (_quickMatchCancellationRequested)
+                {
+                    await CleanupCancelledQuickMatchAsync(matchmadeSession);
+                    return;
                 }
-            };
 
-            var matchmadeSession = await MultiplayerService.Instance.MatchmakeSessionAsync(
-                quickJoinOptions,
-                sessionOptions);
-            if (_quickMatchCancellationRequested)
-            {
-                await CleanupCancelledQuickMatchAsync(matchmadeSession);
-                return;
+                _session = matchmadeSession;
+                CaptureOriginalHost(_session);
+                SubscribeToSession(_session);
+
+                if (_session.IsHost)
+                {
+                    SetState(MultiplayerSessionState.WaitingForOpponent, "Waiting for opponent...");
+                }
+                else
+                {
+                    SetState(MultiplayerSessionState.Connecting, "Opponent found. Connecting...");
+                }
+
+                ApplyNetworkState(_session.Network.State);
+                await TryStartMatchIfReadyAsync();
+                Volatile.Write(ref _reconnectUnavailable, false);
             }
-
-            _session = matchmadeSession;
-            CaptureOriginalHost(_session);
-            SubscribeToSession(_session);
-
-            if (_session.IsHost)
+            catch (Exception exception)
             {
-                SetState(MultiplayerSessionState.WaitingForOpponent, "Waiting for opponent...");
+                if (_quickMatchCancellationRequested)
+                    return;
+
+                ClearSession();
+                throw Fail("Quick Match failed", exception);
             }
-            else
+            finally
             {
-                SetState(MultiplayerSessionState.Connecting, "Opponent found. Connecting...");
+                bool wasCancelled = _quickMatchCancellationRequested;
+                _quickMatchOperationInProgress = false;
+                _quickMatchCancellationRequested = false;
+
+                if (wasCancelled)
+                {
+                    ClearSession();
+                    _intentionalLeave = false;
+                    SetState(MultiplayerSessionState.Idle, "Quick Match cancelled.");
+                }
+
+                TraceSessionOperation("Quick", "exit");
             }
-
-            ApplyNetworkState(_session.Network.State);
-            await TryStartMatchIfReadyAsync();
-        }
-        catch (Exception exception)
-        {
-            if (_quickMatchCancellationRequested)
-                return;
-
-            ClearSession();
-            throw Fail("Quick Match failed", exception);
         }
         finally
         {
-            bool wasCancelled = _quickMatchCancellationRequested;
-            _quickMatchOperationInProgress = false;
-            _quickMatchCancellationRequested = false;
-
-            if (wasCancelled)
-            {
-                ClearSession();
-                _intentionalLeave = false;
-                SetState(MultiplayerSessionState.Idle, "Quick Match cancelled.");
-            }
+            ReleaseSessionOperation(SessionOperation.Quick);
         }
     }
 
     public async Task<bool> TryReconnectAsync()
     {
-        if (_reconnectAttemptInProgress)
+        TraceSessionOperation("Reconnect", "enter");
+        if (!TryAcquireSessionOperation(SessionOperation.Reconnect))
             return false;
 
-        _reconnectAttemptInProgress = true;
+        try
+        {
+            return await TryReconnectOwnedAsync();
+        }
+        finally
+        {
+            ReleaseSessionOperation(SessionOperation.Reconnect);
+        }
+    }
+
+    private async Task<bool> TryReconnectOwnedAsync()
+    {
+        if (Volatile.Read(ref _reconnectUnavailable))
+        {
+            TraceSessionOperation("Reconnect", "reconnect-unavailable-local");
+            SetState(MultiplayerSessionState.Failed, "Reconnect is not available.");
+            return false;
+        }
+
+        if (Interlocked.CompareExchange(ref _reconnectAttemptInProgress, 1, 0) != 0)
+        {
+            TraceSessionOperation("Reconnect", "gate-rejected");
+            return false;
+        }
+
+        TraceSessionOperation("Reconnect", "gate-acquired");
+
         _unexpectedClientDisconnectPending = false;
 
         try
         {
+            if (Volatile.Read(ref _reconnectUnavailable))
+            {
+                TraceSessionOperation("Reconnect", "reconnect-unavailable-local");
+                SetState(MultiplayerSessionState.Failed, "Reconnect is not available.");
+                return false;
+            }
+
+            var networkManager = NetworkManager.Singleton;
+            if (networkManager == null)
+                throw new InvalidOperationException("NetworkManager is required for session reconnect.");
+            if (networkManager.IsListening)
+            {
+                TraceSessionOperation("Reconnect", "already-connected");
+                SetState(MultiplayerSessionState.Connected, "Already connected.");
+                return false;
+            }
+
             await InitializeAsync();
 
             if (_session?.IsHost == true)
@@ -273,15 +394,11 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 return false;
             }
 
-            var networkManager = NetworkManager.Singleton;
-            if (networkManager == null)
-                throw new InvalidOperationException("NetworkManager is required for session reconnect.");
-            if (networkManager.IsListening)
-                throw new InvalidOperationException("Cannot reconnect while networking is already active.");
-
             SetState(MultiplayerSessionState.Reconnecting, "Reconnecting...");
 
+            TraceSessionOperation("Reconnect", "before-mps");
             var joinedMemberships = await MultiplayerService.Instance.GetJoinedSessionIdsAsync();
+            TraceSessionOperation("Reconnect", "after-mps");
             var joinedSessionIds = (joinedMemberships ?? new List<string>())
                 .Where(sessionId => !string.IsNullOrWhiteSpace(sessionId))
                 .Distinct(StringComparer.Ordinal)
@@ -289,6 +406,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             UnityEngine.Debug.Log($"[Reconnect] joined membership count = {joinedSessionIds.Count}");
             if (joinedSessionIds.Count == 0)
             {
+                TraceSessionOperation("Reconnect", "zero-memberships");
+                Volatile.Write(ref _reconnectUnavailable, true);
                 ClearSession();
                 SetState(MultiplayerSessionState.Failed, "Session expired. Reconnect is no longer available.");
                 return false;
@@ -304,7 +423,9 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             ConfigureNgoIdentityPayload();
 
             UnityEngine.Debug.Log("[Reconnect] calling ReconnectToSessionAsync");
+            TraceSessionOperation("Reconnect", "before-mps");
             var reconnectedSession = await MultiplayerService.Instance.ReconnectToSessionAsync(sessionId);
+            TraceSessionOperation("Reconnect", "after-mps");
             UnityEngine.Debug.Log("[Reconnect] session returned");
             if (reconnectedSession == null)
                 throw new InvalidOperationException("MPS reconnect returned no session.");
@@ -318,6 +439,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             if (!reconnectedSession.Players.Any(player =>
                     string.Equals(player?.Id, LocalPlayerId, StringComparison.Ordinal)))
             {
+                Volatile.Write(ref _reconnectUnavailable, true);
                 SetState(MultiplayerSessionState.Failed, "Reconnect failed: player is no longer a session member.");
                 return false;
             }
@@ -330,6 +452,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         }
         catch (SessionException exception) when (exception.Error == SessionError.SessionNotFound)
         {
+            Volatile.Write(ref _reconnectUnavailable, true);
             ClearSession();
             SetState(MultiplayerSessionState.Failed, "Match ended. The host left.");
             return false;
@@ -342,7 +465,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         }
         finally
         {
-            _reconnectAttemptInProgress = false;
+            Interlocked.Exchange(ref _reconnectAttemptInProgress, 0);
+            TraceSessionOperation("Reconnect", "exit");
         }
     }
 
@@ -358,6 +482,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 return currentSessionId;
             }
 
+            Volatile.Write(ref _reconnectUnavailable, true);
             ClearSession();
             SetState(
                 MultiplayerSessionState.Failed,
@@ -393,6 +518,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             candidates.Count == 0
                 ? "Reconnect failed: no resumable RollForCheckmate match was found."
                 : "Reconnect failed: more than one resumable RollForCheckmate match was found.");
+        if (candidates.Count == 0)
+            Volatile.Write(ref _reconnectUnavailable, true);
         return string.Empty;
     }
 
@@ -436,6 +563,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     public async Task LeaveMatchAsync()
     {
+        TraceSessionOperation("Leave", "enter");
         if (_session == null)
         {
             if (_quickMatchOperationInProgress)
@@ -445,10 +573,12 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 _unexpectedClientDisconnectPending = false;
                 SetState(MultiplayerSessionState.Leaving, "Cancelling Quick Match...");
                 SetState(MultiplayerSessionState.Idle, "Quick Match cancelled.");
+                TraceSessionOperation("Leave", "exit");
                 return;
             }
 
             SetState(MultiplayerSessionState.Idle, "No active match.");
+            TraceSessionOperation("Leave", "exit");
             return;
         }
 
@@ -462,11 +592,14 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
         try
         {
+            TraceSessionOperation("Leave", "before-mps");
             if (sessionToLeave.IsHost)
                 await sessionToLeave.AsHost().DeleteAsync();
             else
                 await sessionToLeave.LeaveAsync();
+            TraceSessionOperation("Leave", "after-mps");
 
+            Volatile.Write(ref _reconnectUnavailable, true);
             ClearSession();
             SetState(MultiplayerSessionState.Idle, "Left match.");
         }
@@ -477,6 +610,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         finally
         {
             _intentionalLeave = false;
+            TraceSessionOperation("Leave", "exit");
         }
     }
 
@@ -517,6 +651,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     {
         if (sessionState == SessionState.Deleted)
         {
+            Volatile.Write(ref _reconnectUnavailable, true);
             ClearSession();
             SetState(MultiplayerSessionState.Idle, "Private match ended.");
         }
@@ -528,6 +663,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     private void OnSessionRemoved()
     {
+        Volatile.Write(ref _reconnectUnavailable, true);
         ClearSession();
         SetState(
             _intentionalLeave ? MultiplayerSessionState.Idle : MultiplayerSessionState.Failed,
@@ -841,7 +977,10 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     private async void OnNgoClientStopped(bool isHost)
     {
-        if (isHost || !_unexpectedClientDisconnectPending || _intentionalLeave || _reconnectAttemptInProgress)
+        if (isHost ||
+            !_unexpectedClientDisconnectPending ||
+            _intentionalLeave ||
+            Volatile.Read(ref _reconnectAttemptInProgress) != 0)
             return;
 
         await TryReconnectAsync();
@@ -995,5 +1134,57 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         State = state;
         StatusMessage = message;
         StatusChanged?.Invoke(state, message);
+    }
+
+    private bool TryAcquireSessionOperation(SessionOperation operation)
+    {
+        bool acquired = Interlocked.CompareExchange(
+            ref _sessionOperationOwner,
+            (int)operation,
+            (int)SessionOperation.None) == (int)SessionOperation.None;
+        TraceSessionOperation(operation.ToString(), acquired ? "operation-acquired" : "operation-rejected");
+        return acquired;
+    }
+
+    private bool RejectExistingSessionLifecycle(SessionOperation operation)
+    {
+        if (_session == null)
+            return false;
+
+        TraceSessionOperation(operation.ToString(), "existing-session-rejected");
+        return true;
+    }
+
+    private void ReleaseSessionOperation(SessionOperation operation)
+    {
+        bool released = Interlocked.CompareExchange(
+            ref _sessionOperationOwner,
+            (int)SessionOperation.None,
+            (int)operation) == (int)operation;
+        TraceSessionOperation(operation.ToString(), released ? "operation-released" : "operation-release-rejected");
+    }
+
+    private void TraceSessionOperation(string operation, string phase)
+    {
+        var networkManager = NetworkManager.Singleton;
+        var sessionId = _session?.Id;
+        if (string.IsNullOrEmpty(sessionId))
+            sessionId = "none";
+
+        UnityEngine.Debug.Log(
+            $"[SessionOp] build={DiagnosticBuildMarker} " +
+            $"service={RuntimeHelpers.GetHashCode(this)} " +
+            $"operation={operation} " +
+            $"phase={phase} " +
+            $"state={State} " +
+            $"session={sessionId} " +
+            $"isListening={networkManager?.IsListening ?? false} " +
+            $"isClient={networkManager?.IsClient ?? false} " +
+            $"isServer={networkManager?.IsServer ?? false} " +
+            $"operationOwner={(SessionOperation)Volatile.Read(ref _sessionOperationOwner)} " +
+            $"reconnectGate={Volatile.Read(ref _reconnectAttemptInProgress)} " +
+            $"quickInProgress={_quickMatchOperationInProgress} " +
+            $"thread={Thread.CurrentThread.ManagedThreadId} " +
+            $"dataPath={UnityEngine.Application.dataPath}");
     }
 }
