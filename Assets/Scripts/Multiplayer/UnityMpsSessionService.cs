@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.Services.Authentication;
+using Unity.Services.Lobbies;
 using Unity.Services.Multiplayer;
 using Unity.Services.Relay.Models;
 
@@ -13,6 +14,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private const int MatchPlayerLimit = 2;
     private const int MaximumPlayerIdPayloadBytes = 256;
     private const int QuickJoinTimeoutSeconds = 5;
+    private const string PrivateMatchName = "RollForCheckmate Private Match";
+    private const string QuickMatchName = "RollForCheckmate Quick Match";
     private const string MatchmakingStatePropertyKey = "matchmakingState";
     private const string QuickMatchWaitingValue = "rfc.chess.quick.v1.waiting.2p";
     private const string QuickMatchStartedValue = "rfc.chess.quick.v1.started.2p";
@@ -23,6 +26,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private bool _intentionalLeave;
     private bool _unexpectedClientDisconnectPending;
     private bool _reconnectAttemptInProgress;
+    private bool _quickMatchOperationInProgress;
+    private bool _quickMatchCancellationRequested;
     private ulong? _connectedLocalClientId;
     private readonly Dictionary<ulong, string> _validatedPlayerIdsByClientId = new();
     private readonly HashSet<string> _expectedNetworkPlayerIds = new(StringComparer.Ordinal);
@@ -86,7 +91,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         {
             var options = new SessionOptions
             {
-                Name = "RollForCheckmate Private Match",
+                Name = PrivateMatchName,
                 MaxPlayers = MatchPlayerLimit,
                 IsPrivate = true,
                 IsLocked = false
@@ -104,7 +109,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 MultiplayerSessionState.WaitingForOpponent,
                 $"Private match created. Code: {_session.Code}. Waiting for opponent...");
 
-            await TryStartHostNetworkAsync();
+            await TryStartMatchIfReadyAsync();
         }
         catch (Exception exception)
         {
@@ -149,15 +154,21 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     public async Task FindOrCreateQuickMatchAsync()
     {
         EnsureNoActiveSession();
-        await InitializeAsync();
-        ConfigureNgoIdentityPayload();
-        SetState(MultiplayerSessionState.Searching, "Searching for opponent...");
+        _quickMatchOperationInProgress = true;
+        _quickMatchCancellationRequested = false;
 
         try
         {
+            await InitializeAsync();
+            if (_quickMatchCancellationRequested)
+                return;
+
+            ConfigureNgoIdentityPayload();
+            SetState(MultiplayerSessionState.Searching, "Searching for opponent...");
+
             var sessionOptions = new SessionOptions
             {
-                Name = "RollForCheckmate Quick Match",
+                Name = QuickMatchName,
                 MaxPlayers = MatchPlayerLimit,
                 IsPrivate = false,
                 IsLocked = false,
@@ -196,9 +207,16 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 }
             };
 
-            _session = await MultiplayerService.Instance.MatchmakeSessionAsync(
+            var matchmadeSession = await MultiplayerService.Instance.MatchmakeSessionAsync(
                 quickJoinOptions,
                 sessionOptions);
+            if (_quickMatchCancellationRequested)
+            {
+                await CleanupCancelledQuickMatchAsync(matchmadeSession);
+                return;
+            }
+
+            _session = matchmadeSession;
             CaptureOriginalHost(_session);
             SubscribeToSession(_session);
 
@@ -212,12 +230,28 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             }
 
             ApplyNetworkState(_session.Network.State);
-            await TryStartHostNetworkAsync();
+            await TryStartMatchIfReadyAsync();
         }
         catch (Exception exception)
         {
+            if (_quickMatchCancellationRequested)
+                return;
+
             ClearSession();
             throw Fail("Quick Match failed", exception);
+        }
+        finally
+        {
+            bool wasCancelled = _quickMatchCancellationRequested;
+            _quickMatchOperationInProgress = false;
+            _quickMatchCancellationRequested = false;
+
+            if (wasCancelled)
+            {
+                ClearSession();
+                _intentionalLeave = false;
+                SetState(MultiplayerSessionState.Idle, "Quick Match cancelled.");
+            }
         }
     }
 
@@ -247,7 +281,12 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
             SetState(MultiplayerSessionState.Reconnecting, "Reconnecting...");
 
-            var joinedSessionIds = await MultiplayerService.Instance.GetJoinedSessionIdsAsync();
+            var joinedMemberships = await MultiplayerService.Instance.GetJoinedSessionIdsAsync();
+            var joinedSessionIds = (joinedMemberships ?? new List<string>())
+                .Where(sessionId => !string.IsNullOrWhiteSpace(sessionId))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            UnityEngine.Debug.Log($"[Reconnect] joined membership count = {joinedSessionIds.Count}");
             if (joinedSessionIds.Count == 0)
             {
                 ClearSession();
@@ -255,27 +294,21 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 return false;
             }
 
-            if (joinedSessionIds.Count != 1)
-            {
-                SetState(
-                    MultiplayerSessionState.Failed,
-                    "Reconnect failed: more than one active session was found.");
+            UnityEngine.Debug.Log("[Reconnect] selecting session");
+            var sessionId = await SelectReconnectSessionIdAsync(joinedSessionIds);
+            if (string.IsNullOrEmpty(sessionId))
                 return false;
-            }
 
-            var sessionId = joinedSessionIds[0];
-            if (_session != null &&
-                !string.Equals(_session.Id, sessionId, StringComparison.Ordinal))
-            {
-                SetState(
-                    MultiplayerSessionState.Failed,
-                    "Reconnect failed: the retained session does not match the current match.");
-                return false;
-            }
-
+            UnityEngine.Debug.Log($"[Reconnect] selected session {sessionId}");
+            UnityEngine.Debug.Log("[Reconnect] configuring NGO identity");
             ConfigureNgoIdentityPayload();
 
+            UnityEngine.Debug.Log("[Reconnect] calling ReconnectToSessionAsync");
             var reconnectedSession = await MultiplayerService.Instance.ReconnectToSessionAsync(sessionId);
+            UnityEngine.Debug.Log("[Reconnect] session returned");
+            if (reconnectedSession == null)
+                throw new InvalidOperationException("MPS reconnect returned no session.");
+
             if (reconnectedSession.IsHost)
             {
                 SetState(MultiplayerSessionState.Failed, "Host reconnect is not supported for this match.");
@@ -283,19 +316,27 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             }
 
             if (!reconnectedSession.Players.Any(player =>
-                    string.Equals(player.Id, LocalPlayerId, StringComparison.Ordinal)))
+                    string.Equals(player?.Id, LocalPlayerId, StringComparison.Ordinal)))
             {
                 SetState(MultiplayerSessionState.Failed, "Reconnect failed: player is no longer a session member.");
                 return false;
             }
 
+            UnityEngine.Debug.Log("[Reconnect] replacing session");
             ReplaceSession(reconnectedSession);
             SetState(MultiplayerSessionState.Connecting, "Rejoined session. Connecting...");
             ApplyNetworkState(reconnectedSession.Network.State);
             return reconnectedSession.Network.State == NetworkState.Started;
         }
+        catch (SessionException exception) when (exception.Error == SessionError.SessionNotFound)
+        {
+            ClearSession();
+            SetState(MultiplayerSessionState.Failed, "Match ended. The host left.");
+            return false;
+        }
         catch (Exception exception)
         {
+            UnityEngine.Debug.LogException(exception);
             Fail("Reconnect failed", exception);
             return false;
         }
@@ -305,13 +346,114 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         }
     }
 
+    private async Task<string> SelectReconnectSessionIdAsync(IReadOnlyList<string> joinedSessionIds)
+    {
+        if (_session != null)
+        {
+            var currentSessionId = _session.Id;
+            UnityEngine.Debug.Log($"[Reconnect] checking current session {currentSessionId}");
+            if (joinedSessionIds.Any(sessionId =>
+                    string.Equals(sessionId, currentSessionId, StringComparison.Ordinal)))
+            {
+                return currentSessionId;
+            }
+
+            ClearSession();
+            SetState(
+                MultiplayerSessionState.Failed,
+                "Session expired. The current match membership is no longer available.");
+            return string.Empty;
+        }
+
+        if (joinedSessionIds.Count == 1)
+            return joinedSessionIds[0];
+
+        var candidates = new List<string>();
+        foreach (var sessionId in joinedSessionIds)
+        {
+            try
+            {
+                UnityEngine.Debug.Log($"[Reconnect] inspecting session {sessionId}");
+                var lobby = await LobbyService.Instance.GetLobbyAsync(sessionId);
+                if (IsResumableRollForCheckmateLobby(lobby, sessionId))
+                    candidates.Add(sessionId);
+            }
+            catch (LobbyServiceException exception)
+                when (exception.Reason == LobbyExceptionReason.LobbyNotFound)
+            {
+                // GetJoinedSessionIdsAsync can briefly include a lobby that has just expired or been deleted.
+            }
+        }
+
+        if (candidates.Count == 1)
+            return candidates[0];
+
+        SetState(
+            MultiplayerSessionState.Failed,
+            candidates.Count == 0
+                ? "Reconnect failed: no resumable RollForCheckmate match was found."
+                : "Reconnect failed: more than one resumable RollForCheckmate match was found.");
+        return string.Empty;
+    }
+
+    private bool IsResumableRollForCheckmateLobby(
+        Unity.Services.Lobbies.Models.Lobby lobby,
+        string expectedSessionId)
+    {
+        if (lobby == null ||
+            !string.Equals(lobby.Id, expectedSessionId, StringComparison.Ordinal) ||
+            lobby.MaxPlayers != MatchPlayerLimit ||
+            !lobby.IsLocked ||
+            string.IsNullOrEmpty(lobby.HostId) ||
+            lobby.Players == null ||
+            string.Equals(lobby.HostId, LocalPlayerId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var playerIds = lobby.Players
+            .Select(player => player?.Id)
+            .Where(playerId => !string.IsNullOrEmpty(playerId))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (playerIds.Length != MatchPlayerLimit ||
+            !playerIds.Contains(LocalPlayerId, StringComparer.Ordinal) ||
+            !playerIds.Contains(lobby.HostId, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        if (string.Equals(lobby.Name, PrivateMatchName, StringComparison.Ordinal))
+            return lobby.IsPrivate;
+
+        return string.Equals(lobby.Name, QuickMatchName, StringComparison.Ordinal) &&
+               !lobby.IsPrivate &&
+               lobby.Data != null &&
+               lobby.Data.TryGetValue(MatchmakingStatePropertyKey, out var matchmakingState) &&
+               matchmakingState != null &&
+               string.Equals(matchmakingState.Value, QuickMatchStartedValue, StringComparison.Ordinal);
+    }
+
     public async Task LeaveMatchAsync()
     {
         if (_session == null)
         {
+            if (_quickMatchOperationInProgress)
+            {
+                _quickMatchCancellationRequested = true;
+                _intentionalLeave = true;
+                _unexpectedClientDisconnectPending = false;
+                SetState(MultiplayerSessionState.Leaving, "Cancelling Quick Match...");
+                SetState(MultiplayerSessionState.Idle, "Quick Match cancelled.");
+                return;
+            }
+
             SetState(MultiplayerSessionState.Idle, "No active match.");
             return;
         }
+
+        if (_quickMatchOperationInProgress)
+            _quickMatchCancellationRequested = true;
 
         _intentionalLeave = true;
         _unexpectedClientDisconnectPending = false;
@@ -356,26 +498,19 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 return;
             }
 
-            if (_session.IsHost &&
-                _session.PlayerCount < MatchPlayerLimit &&
-                _session.AsHost().Network.State == NetworkState.Stopped)
+            if (CanShowWaitingForOpponent())
             {
                 SetState(
                     MultiplayerSessionState.WaitingForOpponent,
                     GetWaitingForOpponentMessage());
             }
 
-            await TryStartHostNetworkAsync();
+            await TryStartMatchIfReadyAsync();
         }
         catch (Exception exception)
         {
             Fail("Host network start failed", exception);
         }
-    }
-
-    private void OnPlayerJoined(string playerId)
-    {
-        OnSessionChanged();
     }
 
     private void OnSessionStateChanged(SessionState sessionState)
@@ -401,6 +536,31 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 : "Session ended or reconnect membership expired.");
     }
 
+    private static async Task CleanupCancelledQuickMatchAsync(ISession session)
+    {
+        if (session == null)
+            return;
+
+        try
+        {
+            if (session.IsHost)
+                await session.AsHost().DeleteAsync();
+            else
+                await session.LeaveAsync();
+        }
+        catch (SessionException exception) when (
+            exception.Error == SessionError.SessionNotFound ||
+            exception.Error == SessionError.SessionDeleted ||
+            exception.Error == SessionError.NotInLobby)
+        {
+            // The cancelled result was already removed while the Quick Match request was completing.
+        }
+        catch (Exception exception)
+        {
+            UnityEngine.Debug.LogException(exception);
+        }
+    }
+
     private void OnNetworkStateChanged(NetworkState networkState)
     {
         ApplyNetworkState(networkState);
@@ -412,7 +572,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         SetState(MultiplayerSessionState.Failed, $"Network start failed: {error}.");
     }
 
-    private async Task TryStartHostNetworkAsync()
+    private async Task TryStartMatchIfReadyAsync()
     {
         if (_session == null ||
             !_session.IsHost ||
@@ -475,7 +635,6 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private void SubscribeToSession(ISession session)
     {
         session.Changed += OnSessionChanged;
-        session.PlayerJoined += OnPlayerJoined;
         session.StateChanged += OnSessionStateChanged;
         session.Deleted += OnSessionRemoved;
         session.RemovedFromSession += OnSessionRemoved;
@@ -486,7 +645,6 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private void UnsubscribeFromSession(ISession session)
     {
         session.Changed -= OnSessionChanged;
-        session.PlayerJoined -= OnPlayerJoined;
         session.StateChanged -= OnSessionStateChanged;
         session.Deleted -= OnSessionRemoved;
         session.RemovedFromSession -= OnSessionRemoved;
@@ -556,23 +714,33 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     private void CaptureExpectedNetworkPlayerIds()
     {
-        _expectedNetworkPlayerIds.Clear();
-
         if (_session == null || !_session.IsHost)
             throw new InvalidOperationException("Only the session host can establish network participants.");
 
+        var currentPlayerIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var player in _session.Players)
         {
             if (!string.IsNullOrEmpty(player.Id))
-                _expectedNetworkPlayerIds.Add(player.Id);
+                currentPlayerIds.Add(player.Id);
         }
 
-        if (_expectedNetworkPlayerIds.Count != MatchPlayerLimit ||
+        if (currentPlayerIds.Count != MatchPlayerLimit ||
             string.IsNullOrEmpty(_session.Host) ||
-            !_expectedNetworkPlayerIds.Contains(_session.Host) ||
-            !string.Equals(LocalPlayerId, _session.Host, StringComparison.Ordinal))
+            !currentPlayerIds.Contains(_session.Host) ||
+            !string.Equals(LocalPlayerId, _session.Host, StringComparison.Ordinal) ||
+            !string.Equals(_originalHostPlayerId, _session.Host, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("The private match participant list is not ready for network startup.");
+            throw new InvalidOperationException("The match participant list is not ready for network startup.");
+        }
+
+        if (_expectedNetworkPlayerIds.Count == 0)
+        {
+            foreach (var playerId in currentPlayerIds)
+                _expectedNetworkPlayerIds.Add(playerId);
+        }
+        else if (!_expectedNetworkPlayerIds.SetEquals(currentPlayerIds))
+        {
+            throw new InvalidOperationException("Match participants changed after seat identities were frozen.");
         }
 
         _validatedPlayerIdsByClientId[NetworkManager.ServerClientId] = LocalPlayerId;
@@ -718,6 +886,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     {
         if (_session != null)
             throw new InvalidOperationException("Leave the current match before starting another one.");
+        if (_quickMatchOperationInProgress)
+            throw new InvalidOperationException("Wait for the current Quick Match search to finish cancelling.");
     }
 
     private string GetWaitingForOpponentMessage()
@@ -725,6 +895,24 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         return IsQuickMatchSession(_session)
             ? "Waiting for opponent..."
             : $"Private match created. Code: {_session.Code}. Waiting for opponent...";
+    }
+
+    private bool CanShowWaitingForOpponent()
+    {
+        if (_session == null ||
+            !_session.IsHost ||
+            !IsOriginalHost() ||
+            _session.PlayerCount >= MatchPlayerLimit ||
+            _expectedNetworkPlayerIds.Count != 0)
+        {
+            return false;
+        }
+
+        var hostSession = _session.AsHost();
+        if (hostSession.IsLocked || hostSession.Network.State != NetworkState.Stopped)
+            return false;
+
+        return !IsQuickMatchSession(hostSession) || IsQuickMatchWaitingSession(hostSession);
     }
 
     private void CaptureOriginalHost(ISession session)
@@ -749,6 +937,13 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
         return string.Equals(property.Value, QuickMatchWaitingValue, StringComparison.Ordinal) ||
                string.Equals(property.Value, QuickMatchStartedValue, StringComparison.Ordinal);
+    }
+
+    private static bool IsQuickMatchWaitingSession(ISession session)
+    {
+        return session != null &&
+               session.Properties.TryGetValue(MatchmakingStatePropertyKey, out var property) &&
+               string.Equals(property.Value, QuickMatchWaitingValue, StringComparison.Ordinal);
     }
 
     private InvalidOperationException Fail(string operation, Exception exception)
