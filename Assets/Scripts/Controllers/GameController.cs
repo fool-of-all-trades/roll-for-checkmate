@@ -28,6 +28,13 @@ namespace Controller
             pieces = new List<Piece>(allPieces);
             _pendingAscensionPawn = null;
             _pendingAscensionMovePiece = null;
+
+            if (IsServer)
+            {
+                turnMgr.ResetForNewMatch();
+                TurnSync.Instance?.CommitTurn(turnMgr.WhiteTurn);
+                CommitEnPassantNetworkState();
+            }
         }
 
         /* ───────────── GameController event contracts ───────────── */

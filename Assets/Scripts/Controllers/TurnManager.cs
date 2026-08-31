@@ -17,7 +17,13 @@ public class TurnManager
 
     public TurnManager()
     {
+        ResetForNewMatch();
+    }
+
+    public void ResetForNewMatch()
+    {
         WhiteTurn = whiteStarts;
+        ClearEnPassant();
     }
 
     public void ToggleTurn()
