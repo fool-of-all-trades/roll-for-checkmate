@@ -25,6 +25,9 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private const int MatchPlayerLimit = 2;
     private const int MaximumPlayerIdPayloadBytes = 256;
     private const int QuickJoinTimeoutSeconds = 5;
+    // Covers the configured 60-second UTP connection-attempt window, NGO's
+    // 10-second approval window, and a small MPS scheduling margin.
+    private const int ClientConnectionStartupTimeoutSeconds = 15;
     private const string PrivateMatchName = "RollForCheckmate Private Match";
     private const string QuickMatchName = "RollForCheckmate Quick Match";
     private const string MatchmakingStatePropertyKey = "matchmakingState";
@@ -41,6 +44,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private bool _reconnectUnavailable;
     private int _sessionOperationOwner;
     private long _sessionLifecycleGeneration;
+    private long _clientConnectionStartupGeneration;
+    private string _clientConnectionStartupSessionId = string.Empty;
     private bool _quickMatchOperationInProgress;
     private bool _quickMatchCancellationRequested;
     private ulong? _connectedLocalClientId;
@@ -192,6 +197,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 SubscribeToSession(_session);
                 SetState(MultiplayerSessionState.Connecting, "Joined private match. Waiting for host network...");
                 ApplyNetworkState(_session.Network.State);
+                BeginClientConnectionStartup(_session);
                 Volatile.Write(ref _reconnectUnavailable, false);
                 TraceSessionOperation("JoinPrivate", "exit");
             }
@@ -300,6 +306,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 }
 
                 ApplyNetworkState(_session.Network.State);
+                BeginClientConnectionStartup(_session);
                 await TryStartMatchIfReadyAsync();
                 Volatile.Write(ref _reconnectUnavailable, false);
             }
@@ -489,6 +496,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             ReplaceSession(reconnectedSession);
             SetState(MultiplayerSessionState.Connecting, "Rejoined session. Connecting...");
             ApplyNetworkState(reconnectedSession.Network.State);
+            BeginClientConnectionStartup(reconnectedSession);
             return reconnectedSession.Network.State == NetworkState.Started;
         }
         catch (SessionException exception) when (exception.Error == SessionError.SessionNotFound)
@@ -617,6 +625,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     public async Task LeaveMatchAsync()
     {
         TraceSessionOperation("Leave", "enter");
+        RetireClientConnectionStartup("client-startup-stale");
         Interlocked.Increment(ref _sessionLifecycleGeneration);
 
         if ((SessionOperation)Volatile.Read(ref _sessionOperationOwner) == SessionOperation.Reconnect)
@@ -718,6 +727,9 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     {
         if (sessionState == SessionState.Deleted)
         {
+            if (TryFailCurrentClientConnectionStartup("client-startup-failed"))
+                return;
+
             Volatile.Write(ref _reconnectUnavailable, true);
             ClearSession();
             SetState(MultiplayerSessionState.Idle, "Private match ended.");
@@ -730,6 +742,9 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     private void OnSessionRemoved()
     {
+        if (TryFailCurrentClientConnectionStartup("client-startup-failed"))
+            return;
+
         Volatile.Write(ref _reconnectUnavailable, true);
         ClearSession();
         SetState(
@@ -772,6 +787,9 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
     private void OnNetworkStartFailed(SessionError error)
     {
         _hostNetworkStartRequested = false;
+        if (TryFailCurrentClientConnectionStartup("client-startup-failed"))
+            return;
+
         SetState(MultiplayerSessionState.Failed, $"Network start failed: {error}.");
     }
 
@@ -825,6 +843,7 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
                 SetState(MultiplayerSessionState.Connecting, "Connecting...");
                 break;
             case NetworkState.Started:
+                RetireClientConnectionStartup("client-startup-connected");
                 if (_session?.IsHost == false && _identityNetworkManager != null)
                     _connectedLocalClientId = _identityNetworkManager.LocalClientId;
                 SetState(MultiplayerSessionState.Connected, "Connected!");
@@ -857,6 +876,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     private void ClearSession()
     {
+        RetireClientConnectionStartup("client-startup-stale");
+
         if (_session != null)
             UnsubscribeFromSession(_session);
 
@@ -872,6 +893,8 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     private void ReplaceSession(ISession session)
     {
+        RetireClientConnectionStartup("client-startup-stale");
+
         if (_session != null)
             UnsubscribeFromSession(_session);
 
@@ -1034,6 +1057,12 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             return;
         }
 
+        if (!_connectedLocalClientId.HasValue &&
+            TryFailCurrentClientConnectionStartup("client-startup-failed"))
+        {
+            return;
+        }
+
         if (_connectedLocalClientId.HasValue && clientId != _connectedLocalClientId.Value)
             return;
 
@@ -1044,6 +1073,9 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
 
     private async void OnNgoClientStopped(bool isHost)
     {
+        if (!isHost && TryFailCurrentClientConnectionStartup("client-startup-failed"))
+            return;
+
         if (isHost ||
             !_unexpectedClientDisconnectPending ||
             _intentionalLeave ||
@@ -1086,6 +1118,195 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
         response.CreatePlayerObject = false;
         response.Pending = false;
         response.Reason = reason;
+    }
+
+    private void BeginClientConnectionStartup(ISession session)
+    {
+        if (session == null ||
+            session.IsHost ||
+            !ReferenceEquals(_session, session) ||
+            session.Network.State == NetworkState.Started)
+        {
+            return;
+        }
+
+        var sessionId = session.Id;
+        if (string.IsNullOrEmpty(sessionId))
+            return;
+
+        long startupGeneration = Interlocked.Increment(ref _clientConnectionStartupGeneration);
+        long lifecycleGeneration = Interlocked.Read(ref _sessionLifecycleGeneration);
+        Interlocked.Exchange(ref _clientConnectionStartupSessionId, sessionId);
+        TraceSessionOperation("ClientStartup", "client-startup-begin");
+        _ = MonitorClientConnectionStartupAsync(
+            session,
+            sessionId,
+            startupGeneration,
+            lifecycleGeneration);
+    }
+
+    private async Task MonitorClientConnectionStartupAsync(
+        ISession session,
+        string sessionId,
+        long startupGeneration,
+        long lifecycleGeneration)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(ClientConnectionStartupTimeoutSeconds));
+
+        if (!TryClaimClientConnectionStartup(
+                session,
+                sessionId,
+                startupGeneration,
+                lifecycleGeneration,
+                "client-startup-timeout"))
+        {
+            TraceSessionOperation("ClientStartup", "client-startup-stale");
+            return;
+        }
+
+        await CleanupFailedClientConnectionStartupAsync(session);
+    }
+
+    private bool TryFailCurrentClientConnectionStartup(string phase)
+    {
+        var session = _session;
+        var sessionId = Volatile.Read(ref _clientConnectionStartupSessionId);
+        if (session == null || session.IsHost || string.IsNullOrEmpty(sessionId))
+            return false;
+
+        long startupGeneration = Interlocked.Read(ref _clientConnectionStartupGeneration);
+        long lifecycleGeneration = Interlocked.Read(ref _sessionLifecycleGeneration);
+        if (!TryClaimClientConnectionStartup(
+                session,
+                sessionId,
+                startupGeneration,
+                lifecycleGeneration,
+                phase))
+        {
+            return false;
+        }
+
+        _ = CleanupFailedClientConnectionStartupAsync(session);
+        return true;
+    }
+
+    private bool TryClaimClientConnectionStartup(
+        ISession session,
+        string sessionId,
+        long startupGeneration,
+        long lifecycleGeneration,
+        string phase)
+    {
+        if (Interlocked.Read(ref _sessionLifecycleGeneration) != lifecycleGeneration ||
+            !ReferenceEquals(_session, session) ||
+            !string.Equals(session?.Id, sessionId, StringComparison.Ordinal) ||
+            !string.Equals(
+                Volatile.Read(ref _clientConnectionStartupSessionId),
+                sessionId,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (Interlocked.CompareExchange(
+                ref _clientConnectionStartupGeneration,
+                startupGeneration + 1,
+                startupGeneration) != startupGeneration)
+        {
+            return false;
+        }
+
+        Interlocked.CompareExchange(ref _clientConnectionStartupSessionId, string.Empty, sessionId);
+        TraceSessionOperation("ClientStartup", phase);
+        return Interlocked.Read(ref _sessionLifecycleGeneration) == lifecycleGeneration &&
+               ReferenceEquals(_session, session);
+    }
+
+    private void RetireClientConnectionStartup(string phase)
+    {
+        var sessionId = Interlocked.Exchange(ref _clientConnectionStartupSessionId, string.Empty);
+        if (string.IsNullOrEmpty(sessionId))
+            return;
+
+        Interlocked.Increment(ref _clientConnectionStartupGeneration);
+        TraceSessionOperation("ClientStartup", phase);
+    }
+
+    private async Task CleanupFailedClientConnectionStartupAsync(ISession staleSession)
+    {
+        if (staleSession == null || staleSession.IsHost || !ReferenceEquals(_session, staleSession))
+        {
+            TraceSessionOperation("ClientStartup", "client-startup-stale");
+            return;
+        }
+
+        TraceSessionOperation("ClientStartup", "client-startup-cleanup-start");
+        _intentionalLeave = true;
+        _unexpectedClientDisconnectPending = false;
+        Volatile.Write(ref _reconnectUnavailable, true);
+        SetState(MultiplayerSessionState.Leaving, "Match unavailable. Cleaning up...");
+
+        // Prevent late MPS network events from adopting this failed startup while
+        // retaining _session until cleanup finishes, so a new match cannot start yet.
+        UnsubscribeFromSession(staleSession);
+
+        try
+        {
+            await staleSession.LeaveAsync();
+        }
+        catch (SessionException exception) when (
+            exception.Error == SessionError.SessionNotFound ||
+            exception.Error == SessionError.SessionDeleted ||
+            exception.Error == SessionError.NotInLobby ||
+            exception.Error == SessionError.InvalidOperation)
+        {
+            // The host/session can disappear while this terminal cleanup is running.
+        }
+        catch (Exception exception)
+        {
+            UnityEngine.Debug.LogException(exception);
+        }
+
+        await ShutdownPartialClientNetworkAsync();
+
+        if (ReferenceEquals(_session, staleSession))
+        {
+            ClearSession();
+            _intentionalLeave = false;
+            _unexpectedClientDisconnectPending = false;
+            SetState(MultiplayerSessionState.Idle, "Match unavailable. Please try again.");
+            TraceSessionOperation("ClientStartup", "client-startup-cleanup-complete");
+        }
+        else
+        {
+            _intentionalLeave = false;
+            TraceSessionOperation("ClientStartup", "client-startup-stale");
+        }
+    }
+
+    private static async Task ShutdownPartialClientNetworkAsync()
+    {
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager == null || networkManager.IsServer || !networkManager.IsListening)
+            return;
+
+        var stopped = new TaskCompletionSource<bool>();
+        void OnClientStopped(bool wasHost) => stopped.TrySetResult(true);
+
+        networkManager.OnClientStopped += OnClientStopped;
+        try
+        {
+            if (!networkManager.ShutdownInProgress)
+                networkManager.Shutdown();
+
+            await stopped.Task;
+            // MPS schedules its NetworkManagerSession completion for the following frame.
+            await Task.Yield();
+        }
+        finally
+        {
+            networkManager.OnClientStopped -= OnClientStopped;
+        }
     }
 
     private void EnsureNoActiveSession()
@@ -1296,9 +1517,17 @@ public sealed class UnityMpsSessionService : IMultiplayerSessionService
             $"isServer={networkManager?.IsServer ?? false} " +
             $"operationOwner={(SessionOperation)Volatile.Read(ref _sessionOperationOwner)} " +
             $"lifecycleGeneration={Interlocked.Read(ref _sessionLifecycleGeneration)} " +
+            $"clientStartupGeneration={Interlocked.Read(ref _clientConnectionStartupGeneration)} " +
+            $"clientStartupSession={GetClientConnectionStartupSessionIdForTrace()} " +
             $"reconnectGate={Volatile.Read(ref _reconnectAttemptInProgress)} " +
             $"quickInProgress={_quickMatchOperationInProgress} " +
             $"thread={Thread.CurrentThread.ManagedThreadId} " +
             $"dataPath={UnityEngine.Application.dataPath}");
+    }
+
+    private string GetClientConnectionStartupSessionIdForTrace()
+    {
+        var sessionId = Volatile.Read(ref _clientConnectionStartupSessionId);
+        return string.IsNullOrEmpty(sessionId) ? "none" : sessionId;
     }
 }
